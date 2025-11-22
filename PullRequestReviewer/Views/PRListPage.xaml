@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:PullRequestReviewer.ViewModels"
+             xmlns:models="clr-namespace:PullRequestReviewer.Models"
+             xmlns:converters="clr-namespace:PullRequestReviewer.Converters"
+             x:Class="PullRequestReviewer.Views.PRListPage"
+             x:DataType="viewmodels:PRListViewModel"
+             Title="Pull Requests">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:FilterTypeToColorConverter x:Key="FilterTypeToColorConverter"/>
+            <converters:FilterTypeToTextColorConverter x:Key="FilterTypeToTextColorConverter"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Settings"
+                     Command="{Binding NavigateToSettingsCommand}"/>
+    </ContentPage.ToolbarItems>
+
+    <Grid>
+        <!-- Sidebar Toggle Button -->
+        <Button x:Name="ToggleSidebarButton"
+                Text="☰"
+                FontSize="24"
+                WidthRequest="50"
+                HeightRequest="50"
+                CornerRadius="25"
+                BackgroundColor="{DynamicResource Primary}"
+                TextColor="White"
+                HorizontalOptions="Start"
+                VerticalOptions="Start"
+                Margin="10"
+                Clicked="OnToggleSidebarClicked"
+                ZIndex="1000"/>
+
+        <!-- Main Content with Sidebar -->
+        <Grid x:Name="MainGrid" ColumnDefinitions="Auto,*">
+
+            <!-- Sidebar -->
+            <Border x:Name="Sidebar"
+                    Grid.Column="0"
+                    BackgroundColor="{DynamicResource Gray100}"
+                    StrokeThickness="0"
+                    WidthRequest="200"
+                    IsVisible="True"
+                    ZIndex="999">
+                <VerticalStackLayout Spacing="0" Padding="10,70,10,10">
+
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="15,12"
+                            Margin="0,0,0,5">
+                        <Border.BackgroundColor>
+                            <MultiBinding Converter="{StaticResource FilterTypeToColorConverter}">
+                                <Binding Path="CurrentFilter"/>
+                                <Binding Source="All"/>
+                            </MultiBinding>
+                        </Border.BackgroundColor>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding FilterChangedCommand}"
+                                                 CommandParameter="All"/>
+                        </Border.GestureRecognizers>
+                        <Label Text="All"
+                               FontSize="16"
+                               FontAttributes="Bold">
+                            <Label.TextColor>
+                                <MultiBinding Converter="{StaticResource FilterTypeToTextColorConverter}">
+                                    <Binding Path="CurrentFilter"/>
+                                    <Binding Source="All"/>
+                                </MultiBinding>
+                            </Label.TextColor>
+                        </Label>
+                    </Border>
+
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="15,12"
+                            Margin="0,0,0,5">
+                        <Border.BackgroundColor>
+                            <MultiBinding Converter="{StaticResource FilterTypeToColorConverter}">
+                                <Binding Path="CurrentFilter"/>
+                                <Binding Source="ReviewRequested"/>
+                            </MultiBinding>
+                        </Border.BackgroundColor>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding FilterChangedCommand}"
+                                                 CommandParameter="ReviewRequested"/>
+                        </Border.GestureRecognizers>
+                        <Label Text="Review Requested"
+                               FontSize="16">
+                            <Label.TextColor>
+                                <MultiBinding Converter="{StaticResource FilterTypeToTextColorConverter}">
+                                    <Binding Path="CurrentFilter"/>
+                                    <Binding Source="ReviewRequested"/>
+                                </MultiBinding>
+                            </Label.TextColor>
+                        </Label>
+                    </Border>
+
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="15,12"
+                            Margin="0,0,0,5">
+                        <Border.BackgroundColor>
+                            <MultiBinding Converter="{StaticResource FilterTypeToColorConverter}">
+                                <Binding Path="CurrentFilter"/>
+                                <Binding Source="Assigned"/>
+                            </MultiBinding>
+                        </Border.BackgroundColor>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding FilterChangedCommand}"
+                                                 CommandParameter="Assigned"/>
+                        </Border.GestureRecognizers>
+                        <Label Text="Assigned"
+                               FontSize="16">
+                            <Label.TextColor>
+                                <MultiBinding Converter="{StaticResource FilterTypeToTextColorConverter}">
+                                    <Binding Path="CurrentFilter"/>
+                                    <Binding Source="Assigned"/>
+                                </MultiBinding>
+                            </Label.TextColor>
+                        </Label>
+                    </Border>
+
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="15,12"
+                            Margin="0,0,0,5">
+                        <Border.BackgroundColor>
+                            <MultiBinding Converter="{StaticResource FilterTypeToColorConverter}">
+                                <Binding Path="CurrentFilter"/>
+                                <Binding Source="Authored"/>
+                            </MultiBinding>
+                        </Border.BackgroundColor>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding FilterChangedCommand}"
+                                                 CommandParameter="Authored"/>
+                        </Border.GestureRecognizers>
+                        <Label Text="Authored"
+                               FontSize="16">
+                            <Label.TextColor>
+                                <MultiBinding Converter="{StaticResource FilterTypeToTextColorConverter}">
+                                    <Binding Path="CurrentFilter"/>
+                                    <Binding Source="Authored"/>
+                                </MultiBinding>
+                            </Label.TextColor>
+                        </Label>
+                    </Border>
+
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Content Area -->
+            <Grid Grid.Column="1">
+                <RefreshView IsRefreshing="{Binding IsRefreshing}"
+                            Command="{Binding RefreshCommand}">
+                    <ScrollView>
+                        <VerticalStackLayout>
+                            <!-- Loading Indicator -->
+                            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                                             IsVisible="{Binding IsLoading}"
+                                             Color="{DynamicResource Primary}"
+                                             VerticalOptions="Center"
+                                             HorizontalOptions="Center"
+                                             Margin="0,50,0,0"/>
+
+                            <!-- Error Message -->
+                            <Label Text="{Binding ErrorMessage}"
+                                  IsVisible="{Binding HasError}"
+                                  TextColor="Red"
+                                  HorizontalOptions="Center"
+                                  Margin="20"
+                                  HorizontalTextAlignment="Center"/>
+
+                            <!-- Pull Requests List -->
+                            <CollectionView ItemsSource="{Binding PullRequests}"
+                                          SelectionMode="None">
+                                <CollectionView.EmptyView>
+                                    <Label Text="No pull requests found"
+                                          HorizontalOptions="Center"
+                                          VerticalOptions="Center"
+                                          Margin="0,50,0,0"
+                                          TextColor="{DynamicResource Gray600}"
+                                          FontSize="16"/>
+                                </CollectionView.EmptyView>
+
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PullRequestModel">
+                                        <Border Stroke="{DynamicResource Gray300}"
+                                               StrokeThickness="1"
+                                               Padding="15"
+                                               Margin="10,5"
+                                               BackgroundColor="White"
+                                               StrokeShape="RoundRectangle 8">
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PRListViewModel}}, Path=OpenPullRequestCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            </Border.GestureRecognizers>
+
+                                            <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*" RowSpacing="8">
+                                                <!-- Avatar -->
+                                                <Border Grid.Row="0" Grid.RowSpan="4" Grid.Column="0"
+                                                       StrokeShape="RoundRectangle 20"
+                                                       StrokeThickness="0"
+                                                       WidthRequest="40"
+                                                       HeightRequest="40"
+                                                       Margin="0,0,12,0"
+                                                       VerticalOptions="Start">
+                                                    <Image Source="{Binding AuthorAvatarUrl}"
+                                                          Aspect="AspectFill"/>
+                                                </Border>
+
+                                                <!-- Title and Status -->
+                                                <HorizontalStackLayout Grid.Row="0" Grid.Column="1" Spacing="8">
+                                                    <Label Text="{Binding Title}"
+                                                          FontSize="16"
+                                                          FontAttributes="Bold"
+                                                          TextColor="{DynamicResource Gray900}"
+                                                          VerticalOptions="Center"
+                                                          LineBreakMode="WordWrap"
+                                                          MaxLines="2"/>
+                                                </HorizontalStackLayout>
+
+                                                <!-- Repository Info -->
+                                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="5">
+                                                    <Label Text="{Binding RepositoryFullName}"
+                                                          FontSize="14"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                    <Label Text="•"
+                                                          FontSize="14"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                    <Label Text="{Binding Number, StringFormat='#{0}'}"
+                                                          FontSize="14"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                </HorizontalStackLayout>
+
+                                                <!-- Author and Date -->
+                                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="5">
+                                                    <Label Text="{Binding AuthorLogin}"
+                                                          FontSize="13"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                    <Label Text="•"
+                                                          FontSize="13"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                    <Label Text="{Binding DisplayCreatedAt}"
+                                                          FontSize="13"
+                                                          TextColor="{DynamicResource Gray600}"/>
+                                                </HorizontalStackLayout>
+
+                                                <!-- State Badge -->
+                                                <Border Grid.Row="3" Grid.Column="1"
+                                                       BackgroundColor="{Binding StateColor}"
+                                                       StrokeThickness="0"
+                                                       Padding="8,4"
+                                                       HorizontalOptions="Start"
+                                                       StrokeShape="RoundRectangle 4">
+                                                    <Label Text="{Binding State}"
+                                                          TextColor="White"
+                                                          FontSize="12"
+                                                          FontAttributes="Bold"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </RefreshView>
+            </Grid>
+        </Grid>
+    </Grid>
+
+</ContentPage>

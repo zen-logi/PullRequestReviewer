@@ -1,0 +1,71 @@
+﻿# .gitignore for .NET MAUI project
+
+# Build results
+bin/
+obj/
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# IDE/Editor
+.idea/
+.idea/**
+.vscode/
+*.code-workspace
+*.vs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# MAUI/Generated files
+*.stamp
+*.inputs
+*.outputs
+*.cache
+*.g.cs
+*.g.i.cs
+*.AssemblyInfo.cs
+*.editorconfig
+*.props
+*.targets
+*.nupkg
+*.snupkg
+*.log
+
+# NuGet
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nuget.props
+*.nuget.targets
+
+# Test results
+TestResults/
+
+# Local config
+Properties/launchSettings.json
+
+# Platform-specific build folders
+PullRequestReviewer/bin/
+PullRequestReviewer/obj/
+
+# Xamarin/MAUI intermediate folders
+**/lp/
+**/res/
+**/resizetizer/
+**/stamp/
+**/intermediatexaml/
+**/ref/
+**/refint/
+**/MsixContent/
+**/Manifests/
+
+# Misc
+*.tmp
+*.bak
+
+# End of file

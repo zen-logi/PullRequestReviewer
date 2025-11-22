@@ -1,0 +1,129 @@
+﻿# .editorconfig for .NET (Microsoft推奨)
+# 詳細: https://learn.microsoft.com/ja-jp/dotnet/fundamentals/code-analysis/configuration-files
+
+root = true
+
+[*.cs]
+# インデント
+indent_style = space
+indent_size = 4
+
+# 改行コード
+end_of_line = crlf
+insert_final_newline = true
+charset = utf-8-bom
+
+# 余分な空白
+trim_trailing_whitespace = true
+
+# C# コードスタイル
+csharp_new_line_before_open_brace = all
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_prefer_braces = true:suggestion
+csharp_prefer_simple_default_expression = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_indexers = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+
+# ファイルスコープnamespace
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# usingディレクティブ
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# 名前付け規則
+dotnet_naming_rule.private_members_should_be_camel_case.severity = suggestion
+dotnet_naming_rule.private_members_should_be_camel_case.symbols = private_fields
+dotnet_naming_rule.private_members_should_be_camel_case.style = camel_case_style
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.camel_case_style.capitalization = camel_case
+
+# null許容参照型
+nullable = enable
+
+# Analyzer推奨
+# 公式推奨セット: https://github.com/dotnet/runtime/blob/main/.editorconfig
+# ここでは一部のみ例示
+# CA1822: メンバーをstaticに
+dotnet_diagnostic.CA1822.severity = suggestion
+# CA1303: ローカライズされていない文字列リテラル
+# dotnet_diagnostic.CA1303.severity = warning
+
+# --- モダンC#/.NET開発向け推奨ルール追加 ---
+
+# プライマリーコンストラクタはDI注入専用とする（運用ルール）
+# 例: public class FooService(IFooDependency dep) { ... }
+# プライマリーコンストラクタには依存サービスのみを注入し、設定値やプリミティブ値はプロパティ/メソッドで渡すこと
+
+# record型の利用を推奨
+# （明示的なAnalyzerはないが、設計指針として記載）
+# DTOやイミュータブルな値オブジェクトにはrecordを使うこと
+
+# varの利用推奨（型が明確な場合）
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# パターンマッチングやswitch式の活用
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+
+# usingディレクティブはファイル先頭、System優先
+csharp_using_directive_placement = outside_namespace:suggestion
+dotnet_sort_system_directives_first = true
+
+# ファイルスコープnamespace推奨
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# asyncメソッドにはAsyncサフィックスを付与
+dotnet_diagnostic.IDENT0001.severity = suggestion
+
+# インターフェースには summary コメント必須
+# SA1600: 要素にドキュメントコメントが必要
+# SA1601: 部分型にもドキュメントコメントが必要
+dotnet_diagnostic.SA1600.severity = warning
+dotnet_diagnostic.SA1601.severity = warning
+
+# 継承メソッドには <inheritdoc/> コメント必須
+# SA1615: 継承メソッドの戻り値に <inheritdoc/> が必要
+# SA1618: 継承メソッドのパラメータに <inheritdoc/> が必要
+dotnet_diagnostic.SA1615.severity = warning
+dotnet_diagnostic.SA1618.severity = warning
+
+# プロパティ/フィールドの初期化は可能な限りコンストラクタ/初期化子で
+# 明示的なAnalyzerはないが、設計指針として記載
+
+# using staticの利用は最小限に
+
+# 使われていないusingは警告
+dotnet_diagnostic.RemoveUnnecessaryImports.severity = warning
+
+# 使われていない変数は警告
+dotnet_diagnostic.CS0168.severity = warning
+
+# 使われていないprivateメンバーは警告
+# dotnet_diagnostic.CS0169.severity = warning
+
+# --- end モダンC#/.NET推奨ルール ---
+
+# その他
+[*.{csproj,props,targets}]
+indent_style = space
+indent_size = 2

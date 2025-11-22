@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:PullRequestReviewer.ViewModels"
+             xmlns:converters="clr-namespace:PullRequestReviewer.Converters"
+             x:Class="PullRequestReviewer.Views.TokenSettingPage"
+             x:DataType="viewmodels:TokenSettingViewModel"
+             Title="GitHub Token Settings">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+            <converters:ErrorColorConverter x:Key="ErrorColorConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="30" VerticalOptions="Center">
+
+            <Label Text="GitHub Personal Access Token"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,20"/>
+
+            <Label Text="To use this app, you need a GitHub Personal Access Token with 'repo' scope."
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   TextColor="{DynamicResource Gray600}"/>
+
+            <Border Stroke="{DynamicResource Primary}"
+                    StrokeThickness="2"
+                    Background="Transparent"
+                    Padding="10"
+                    Margin="0,20,0,0"
+                    StrokeShape="RoundRectangle 8">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Entry Grid.Column="0"
+                           Text="{Binding Token}"
+                           Placeholder="Enter your GitHub token"
+                           IsPassword="True"
+                           VerticalOptions="Center"/>
+
+                    <Button Grid.Column="1"
+                            Text="Generate Token"
+                            Command="{Binding GenerateTokenCommand}"
+                            VerticalOptions="Center"
+                            Padding="15,8"/>
+                </Grid>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,20,0,0">
+                <Button Grid.Column="0"
+                        Text="Save Token"
+                        Command="{Binding SaveTokenCommand}"
+                        IsEnabled="{Binding IsValidating, Converter={StaticResource InvertedBoolConverter}}"
+                        Padding="0,12"
+                        FontSize="16"
+                        FontAttributes="Bold"/>
+
+                <Button Grid.Column="1"
+                        Text="Reset Token"
+                        Command="{Binding ResetTokenCommand}"
+                        IsEnabled="{Binding IsValidating, Converter={StaticResource InvertedBoolConverter}}"
+                        Padding="0,12"
+                        FontSize="16"
+                        BackgroundColor="{DynamicResource Gray300}"
+                        TextColor="{DynamicResource Gray900}"/>
+            </Grid>
+
+            <ActivityIndicator IsRunning="{Binding IsValidating}"
+                              IsVisible="{Binding IsValidating}"
+                              Color="{DynamicResource Primary}"
+                              Margin="0,10,0,0"/>
+
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding StatusMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                   TextColor="{Binding IsError, Converter={StaticResource ErrorColorConverter}}"
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   Margin="0,10,0,0"/>
+
+            <VerticalStackLayout Spacing="10" Margin="0,30,0,0">
+                <Label Text="How to generate a token:"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Label Text="1. Click 'Generate Token' button above"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Label Text="2. Sign in to GitHub if needed"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Label Text="3. Review the permissions and click 'Generate token'"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Label Text="4. Copy the token and paste it in the field above"
+                       TextColor="{DynamicResource Gray600}"/>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
