@@ -1,6 +1,7 @@
 # Pull Request Reviewer
 
 A cross-platform application for managing and reviewing your GitHub pull requests.
+<img width="993" height="341" alt="image" src="https://github.com/user-attachments/assets/e5015f77-1718-43b0-8f4f-7a3ac786211c" />
 
 ## Features
 
