@@ -9,6 +9,7 @@ namespace PullRequestReviewer.ViewModels;
 public partial class TokenSettingViewModel(
     ISettingsService settingsService,
     IGitHubService gitHubService,
+    IUpdateService updateService,
     ILogger<TokenSettingViewModel> logger) : ObservableObject
 {
 
@@ -24,6 +25,15 @@ public partial class TokenSettingViewModel(
     [ObservableProperty]
     private bool _isError;
 
+    [ObservableProperty]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private string _updateStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _isUpdateAvailable;
+
     public async Task InitializeAsync()
     {
         logger.LogInformation("Initializing token settings view");
@@ -37,6 +47,45 @@ public partial class TokenSettingViewModel(
         {
             logger.LogDebug("No saved token found");
         }
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        if (IsCheckingUpdate) return;
+
+        IsCheckingUpdate = true;
+        UpdateStatusMessage = "Checking for updates...";
+        IsUpdateAvailable = false;
+
+        try
+        {
+            var hasUpdate = await updateService.CheckForUpdatesAsync();
+            if (hasUpdate)
+            {
+                IsUpdateAvailable = true;
+                UpdateStatusMessage = $"Update available: {updateService.LatestVersion}";
+            }
+            else
+            {
+                UpdateStatusMessage = "You are using the latest version.";
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error checking for updates");
+            UpdateStatusMessage = "Failed to check for updates.";
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task UpdateAppAsync()
+    {
+        await updateService.UpdateAppAsync();
     }
 
     [RelayCommand]
