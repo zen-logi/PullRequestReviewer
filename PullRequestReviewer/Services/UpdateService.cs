@@ -1,12 +1,13 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 
 namespace PullRequestReviewer.Services;
 
+/// <inheritdoc />
 public class UpdateService(ILogger<UpdateService> logger) : IUpdateService
 {
     private const string GitHubApiUrl = "https://api.github.com/repos/zen-logi/PullRequestReviewer/releases/latest";
-    private readonly HttpClient _httpClient = new()
+    private readonly HttpClient httpClient = new()
     {
         DefaultRequestHeaders = { { "User-Agent", "PullRequestReviewer-App" } }
     };
@@ -14,23 +15,24 @@ public class UpdateService(ILogger<UpdateService> logger) : IUpdateService
     public string? LatestVersion { get; private set; }
     public string? ReleaseUrl { get; private set; }
 
+    /// <inheritdoc />
     public async Task<bool> CheckForUpdatesAsync()
     {
         try
         {
             logger.LogInformation("Checking for updates...");
-            var release = await _httpClient.GetFromJsonAsync<GitHubRelease>(GitHubApiUrl);
-            
+            var release = await httpClient.GetFromJsonAsync<GitHubRelease>(GitHubApiUrl);
+
             if (release != null)
             {
                 LatestVersion = release.TagName;
                 ReleaseUrl = release.HtmlUrl;
-                
+
                 var currentVersion = AppInfo.VersionString;
-                
+
                 // Simple string comparison for now, assuming semantic versioning with 'v' prefix in tag
                 var cleanLatest = LatestVersion?.TrimStart('v');
-                
+
                 if (Version.TryParse(cleanLatest, out var latest) && Version.TryParse(currentVersion, out var current))
                 {
                     if (latest > current)
@@ -50,6 +52,7 @@ public class UpdateService(ILogger<UpdateService> logger) : IUpdateService
         return false;
     }
 
+    /// <inheritdoc />
     public async Task UpdateAppAsync()
     {
         if (!string.IsNullOrEmpty(ReleaseUrl))
