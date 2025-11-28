@@ -95,6 +95,38 @@
                        TextColor="{DynamicResource Gray600}"/>
             </VerticalStackLayout>
 
+            <BoxView HeightRequest="1" Color="{DynamicResource Gray300}" Margin="0,20"/>
+
+            <Label Text="Application Updates"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,10"/>
+
+            <Button Text="Check for Updates"
+                    Command="{Binding CheckForUpdatesCommand}"
+                    IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"
+                    HorizontalOptions="Center"/>
+
+            <ActivityIndicator IsRunning="{Binding IsCheckingUpdate}"
+                               IsVisible="{Binding IsCheckingUpdate}"
+                               Color="{DynamicResource Primary}"
+                               Margin="0,10,0,0"/>
+
+            <Label Text="{Binding UpdateStatusMessage}"
+                   IsVisible="{Binding UpdateStatusMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   Margin="0,10,0,0"/>
+
+            <Button Text="Update Now"
+                    Command="{Binding UpdateAppCommand}"
+                    IsVisible="{Binding IsUpdateAvailable}"
+                    BackgroundColor="{DynamicResource Secondary}"
+                    TextColor="White"
+                    HorizontalOptions="Center"
+                    Margin="0,10,0,0"/>
+
         </VerticalStackLayout>
     </ScrollView>
 
