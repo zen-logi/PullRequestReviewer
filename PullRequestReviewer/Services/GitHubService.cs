@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -42,14 +42,14 @@ public class GitHubService(
         {
             logger.LogDebug("Validating GitHub token");
 
-            using var testClient = new HttpClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{gitHubOptions.Value.ApiBaseUrl}/user");
             // Use "token" scheme for Personal Access Tokens (not "Bearer")
-            testClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", token);
-            testClient.DefaultRequestHeaders.UserAgent.ParseAdd(gitHubOptions.Value.UserAgent);
-            testClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-            testClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+            request.Headers.Authorization = new AuthenticationHeaderValue("token", token);
+            request.Headers.UserAgent.ParseAdd(gitHubOptions.Value.UserAgent);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
 
-            var response = await testClient.GetAsync($"{gitHubOptions.Value.ApiBaseUrl}/user");
+            var response = await httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             logger.LogInformation("Token validation successful");
@@ -201,148 +201,168 @@ public class GitHubService(
     private async Task<List<PullRequestModel>> ConvertToPullRequestModelsAsync(List<GitHubIssue> issues)
     {
         logger.LogDebug("Converting {Count} issues to PR models", issues.Count);
-        var models = new List<PullRequestModel>();
-
-        foreach (var issue in issues)
+        
+        // Use SemaphoreSlim to limit concurrency (e.g., 5 simultaneous requests)
+        using var semaphore = new SemaphoreSlim(5);
+        
+        var tasks = issues.Select(async issue =>
         {
-            if (issue.PullRequest == null)
-            {
-                logger.LogDebug("Skipping issue #{Number} - not a pull request", issue.Number);
-                continue;
-            }
-
-            // Extract repository info from repository_url or html_url
-            string owner, repoName;
-            if (issue.Repository != null && !string.IsNullOrEmpty(issue.Repository.FullName))
-            {
-                var repoParts = issue.Repository.FullName.Split('/');
-                if (repoParts.Length != 2)
-                {
-                    logger.LogWarning("Invalid repository full name: {FullName}", issue.Repository.FullName);
-                    continue;
-                }
-                owner = repoParts[0];
-                repoName = repoParts[1];
-            }
-            else if (!string.IsNullOrEmpty(issue.RepositoryUrl))
-            {
-                // Parse from repository_url: https://api.github.com/repos/owner/repo
-                var urlParts = issue.RepositoryUrl.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                if (urlParts.Length < 2)
-                {
-                    logger.LogWarning("Invalid repository URL: {Url}", issue.RepositoryUrl);
-                    continue;
-                }
-                owner = urlParts[^2];
-                repoName = urlParts[^1];
-            }
-            else if (!string.IsNullOrEmpty(issue.HtmlUrl))
-            {
-                // Parse from html_url: https://github.com/owner/repo/pull/123
-                var urlParts = issue.HtmlUrl.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                if (urlParts.Length < 4)
-                {
-                    logger.LogWarning("Invalid HTML URL: {Url}", issue.HtmlUrl);
-                    continue;
-                }
-                owner = urlParts[^4];
-                repoName = urlParts[^3];
-            }
-            else
-            {
-                logger.LogWarning("Cannot determine repository for issue #{Number}", issue.Number);
-                continue;
-            }
-
-            var repoFullName = $"{owner}/{repoName}";
-
-            GitHubPullRequest? pr = null;
+            await semaphore.WaitAsync();
             try
             {
-                var prUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}";
-                var prResponse = await httpClient.GetAsync(prUrl);
-                prResponse.EnsureSuccessStatusCode();
-                pr = await prResponse.Content.ReadFromJsonAsync<GitHubPullRequest>(jsonOptions);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to fetch PR details for {Repo}#{Number}", repoFullName, issue.Number);
-                continue;
-            }
-
-            if (pr == null)
-            {
-                logger.LogWarning("Received null PR data for {Repo}#{Number}", repoFullName, issue.Number);
-                continue;
-            }
-
-            var model = new PullRequestModel
-            {
-                Id = issue.Id,
-                Number = issue.Number,
-                Title = issue.Title,
-                State = issue.State,
-                Body = issue.Body ?? string.Empty,
-                HtmlUrl = issue.HtmlUrl,
-                CreatedAt = issue.CreatedAt,
-                UpdatedAt = issue.UpdatedAt,
-                AuthorLogin = issue.User?.Login ?? "Unknown",
-                AuthorAvatarUrl = issue.User?.AvatarUrl,
-                RepositoryName = repoName,
-                RepositoryOwner = owner,
-                RepositoryFullName = repoFullName,
-                IsDraft = pr.Draft,
-                RequestedReviewers = pr.RequestedReviewers?.Select(r => r.Login).ToList() ?? [],
-                Assignees = issue.Assignees?.Select(a => a.Login).ToList() ?? []
-            };
-
-            // Fetch reviews
-            try
-            {
-                var reviewsUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}/reviews";
-                var reviewsResponse = await httpClient.GetAsync(reviewsUrl);
-                reviewsResponse.EnsureSuccessStatusCode();
-                var reviews = await reviewsResponse.Content.ReadFromJsonAsync<List<GitHubReview>>(jsonOptions);
-
-                if (reviews != null && reviews.Count > 0)
+                if (issue.PullRequest == null)
                 {
-                    // Calculate review status based on the latest review for each reviewer
-                    var latestReviews = reviews
-                        .GroupBy(r => r.User.Login)
-                        .Select(g => g.OrderByDescending(r => r.SubmittedAt).First())
-                        .ToList();
+                    logger.LogDebug("Skipping issue #{Number} - not a pull request", issue.Number);
+                    return null;
+                }
 
-                    if (latestReviews.Any(r => r.State == "CHANGES_REQUESTED"))
+                // Extract repository info
+                string owner, repoName;
+                try 
+                {
+                    if (issue.Repository != null && !string.IsNullOrEmpty(issue.Repository.FullName))
                     {
-                        model.ReviewStatus = "Changes Requested";
-                    }
-                    else if (latestReviews.Any(r => r.State == "APPROVED"))
-                    {
-                        model.ReviewStatus = "Approved";
-                    }
-                    else if (latestReviews.Any(r => r.State == "COMMENTED"))
-                    {
-                        model.ReviewStatus = "Commented";
+                        var repoParts = issue.Repository.FullName.Split('/');
+                        if (repoParts.Length != 2) throw new FormatException("Invalid FullName format");
+                        owner = repoParts[0];
+                        repoName = repoParts[1];
                     }
                     else
                     {
-                        model.ReviewStatus = "Review Requested";
+                        // Parse from HTML URL or API URL using Uri class for robustness
+                        var targetUrl = !string.IsNullOrEmpty(issue.RepositoryUrl) ? issue.RepositoryUrl : issue.HtmlUrl;
+                        if (string.IsNullOrEmpty(targetUrl)) throw new InvalidOperationException("No repository URL available");
+
+                        var uri = new Uri(targetUrl);
+                        var segments = uri.Segments.Where(s => s != "/").Select(s => s.TrimEnd('/')).ToArray();
+                        
+                        // Expected format .../repos/owner/repo or .../owner/repo/...
+                        if (targetUrl.Contains("/repos/"))
+                        {
+                            // api.github.com/repos/owner/repo
+                            var repoIndex = Array.IndexOf(segments, "repos");
+                            if (repoIndex >= 0 && repoIndex + 2 < segments.Length)
+                            {
+                                owner = segments[repoIndex + 1];
+                                repoName = segments[repoIndex + 2];
+                            }
+                            else throw new FormatException("Invalid API URL format");
+                        }
+                        else
+                        {
+                            // github.com/owner/repo/pull/123
+                            if (segments.Length >= 2)
+                            {
+                                owner = segments[0];
+                                repoName = segments[1];
+                            }
+                            else throw new FormatException("Invalid HTML URL format");
+                        }
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    model.ReviewStatus = "No Reviews";
+                    logger.LogWarning(ex, "Failed to parse repository info for issue #{Number}", issue.Number);
+                    return null;
                 }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to fetch reviews for {Repo}#{Number}", repoFullName, issue.Number);
-                model.ReviewStatus = "Error";
-            }
 
-            models.Add(model);
-            logger.LogDebug("Converted PR: {Repo}#{Number} - {Title}", repoFullName, issue.Number, issue.Title);
-        }
+                var repoFullName = $"{owner}/{repoName}";
+
+                GitHubPullRequest? pr = null;
+                try
+                {
+                    var prUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}";
+                    var prResponse = await httpClient.GetAsync(prUrl);
+                    prResponse.EnsureSuccessStatusCode();
+                    pr = await prResponse.Content.ReadFromJsonAsync<GitHubPullRequest>(jsonOptions);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to fetch PR details for {Repo}#{Number}", repoFullName, issue.Number);
+                    return null;
+                }
+
+                if (pr == null)
+                {
+                    logger.LogWarning("Received null PR data for {Repo}#{Number}", repoFullName, issue.Number);
+                    return null;
+                }
+
+                var model = new PullRequestModel
+                {
+                    Id = issue.Id,
+                    Number = issue.Number,
+                    Title = issue.Title,
+                    State = issue.State,
+                    Body = issue.Body ?? string.Empty,
+                    HtmlUrl = issue.HtmlUrl,
+                    CreatedAt = issue.CreatedAt,
+                    UpdatedAt = issue.UpdatedAt,
+                    AuthorLogin = issue.User?.Login ?? "Unknown",
+                    AuthorAvatarUrl = issue.User?.AvatarUrl,
+                    RepositoryName = repoName,
+                    RepositoryOwner = owner,
+                    RepositoryFullName = repoFullName,
+                    IsDraft = pr.Draft,
+                    RequestedReviewers = pr.RequestedReviewers?.Select(r => r.Login).ToList() ?? [],
+                    Assignees = issue.Assignees?.Select(a => a.Login).ToList() ?? []
+                };
+
+                // Fetch reviews
+                try
+                {
+                    var reviewsUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}/reviews";
+                    var reviewsResponse = await httpClient.GetAsync(reviewsUrl);
+                    reviewsResponse.EnsureSuccessStatusCode();
+                    var reviews = await reviewsResponse.Content.ReadFromJsonAsync<List<GitHubReview>>(jsonOptions);
+
+                    if (reviews != null && reviews.Count > 0)
+                    {
+                        // Calculate review status based on the latest review for each reviewer
+                        var latestReviews = reviews
+                            .GroupBy(r => r.User.Login)
+                            .Select(g => g.OrderByDescending(r => r.SubmittedAt).First())
+                            .ToList();
+
+                        if (latestReviews.Any(r => r.State == "CHANGES_REQUESTED"))
+                        {
+                            model.ReviewStatus = "Changes Requested";
+                        }
+                        else if (latestReviews.Any(r => r.State == "APPROVED"))
+                        {
+                            model.ReviewStatus = "Approved";
+                        }
+                        else if (latestReviews.Any(r => r.State == "COMMENTED"))
+                        {
+                            model.ReviewStatus = "Commented";
+                        }
+                        else
+                        {
+                            model.ReviewStatus = "Review Requested";
+                        }
+                    }
+                    else
+                    {
+                        model.ReviewStatus = "No Reviews";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to fetch reviews for {Repo}#{Number}", repoFullName, issue.Number);
+                    model.ReviewStatus = "Error";
+                }
+
+                logger.LogDebug("Converted PR: {Repo}#{Number} - {Title}", repoFullName, issue.Number, issue.Title);
+                return model;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        var models = results.Where(m => m != null).Cast<PullRequestModel>().ToList();
 
         logger.LogInformation("Successfully converted {Count} pull requests", models.Count);
         return models;
