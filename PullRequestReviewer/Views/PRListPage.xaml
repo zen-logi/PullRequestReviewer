@@ -12,6 +12,7 @@
         <ResourceDictionary>
             <converters:FilterTypeToColorConverter x:Key="FilterTypeToColorConverter"/>
             <converters:FilterTypeToTextColorConverter x:Key="FilterTypeToTextColorConverter"/>
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -263,6 +264,21 @@
                                                           FontSize="12"
                                                           FontAttributes="Bold"/>
                                                 </Border>
+
+                                                <!-- Review Status Badge -->
+                                                <Border Grid.Row="3" Grid.Column="1"
+                                                        BackgroundColor="{Binding ReviewStatusColor}"
+                                                        StrokeThickness="0"
+                                                        Padding="8,4"
+                                                        HorizontalOptions="Start"
+                                                        StrokeShape="RoundRectangle 4"
+                                                        Margin="60,0,0,0"
+                                                        IsVisible="{Binding ReviewStatus, Converter={StaticResource StringNotEmptyConverter}}">
+                                                    <Label Text="{Binding ReviewStatus}"
+                                                          TextColor="White"
+                                                          FontSize="12"
+                                                          FontAttributes="Bold"/>
+                                                </Border>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -273,6 +289,7 @@
                 </RefreshView>
             </Grid>
         </Grid>
+
     </Grid>
 
 </ContentPage>
