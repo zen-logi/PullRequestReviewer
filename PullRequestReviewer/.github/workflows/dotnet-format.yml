@@ -16,8 +16,11 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
+    - name: Install .NET MAUI Workload
+      run: dotnet workload install maui
+
     - name: Restore dependencies
-      run: dotnet restore PullRequestReviewer/PullRequestReviewer.csproj
+      run: dotnet restore PullRequestReviewer.csproj
 
     - name: Check format
-      run: dotnet format PullRequestReviewer/PullRequestReviewer.csproj --verify-no-changes --verbosity diagnostic
+      run: dotnet format PullRequestReviewer.csproj --verify-no-changes --verbosity diagnostic
