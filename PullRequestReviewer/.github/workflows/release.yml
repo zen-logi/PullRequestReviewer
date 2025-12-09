@@ -1,0 +1,89 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - '.github/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install .NET MAUI Workload
+        run: dotnet workload install maui
+
+      - name: Bump Version
+        id: version_bump
+        shell: pwsh
+        run: |
+          $csprojPath = "PullRequestReviewer/PullRequestReviewer.csproj"
+          
+          if (!(Test-Path $csprojPath)) {
+            Write-Error "Project file not found at $csprojPath"
+            exit 1
+          }
+          
+          [xml]$csproj = Get-Content $csprojPath
+          
+          $version = $csproj.Project.PropertyGroup.ApplicationDisplayVersion
+          if ([string]::IsNullOrEmpty($version)) { $version = "1.0.0" }
+          
+          $versionParts = $version.Split('.')
+          $major = $versionParts[0]
+          $minor = $versionParts[1]
+          $patch = [int]$versionParts[2] + 1
+          
+          $newVersion = "$major.$minor.$patch"
+          $csproj.Project.PropertyGroup.ApplicationDisplayVersion = $newVersion
+          
+          # Also update ApplicationVersion (integer build number)
+          $appVersion = [int]$csproj.Project.PropertyGroup.ApplicationVersion
+          $csproj.Project.PropertyGroup.ApplicationVersion = ($appVersion + 1).ToString()
+          
+          $csproj.Save($csprojPath)
+          
+          echo "NEW_VERSION=$newVersion" >> $env:GITHUB_ENV
+          echo "Previous version: $version"
+          echo "New version: $newVersion"
+
+      - name: Commit & Push Version Bump
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add PullRequestReviewer/PullRequestReviewer.csproj
+          git commit -m "Bump version to ${{ env.NEW_VERSION }}"
+          git push origin main
+
+      - name: Build Release
+        run: |
+          dotnet publish PullRequestReviewer/PullRequestReviewer.csproj -c Release -f net8.0-windows10.0.19041.0 /p:GeneratePackageOnBuild=false --output ./publish_output
+
+      - name: Archive Release
+        run: Compress-Archive -Path ./publish_output/* -DestinationPath ./PullRequestReviewer_${{ env.NEW_VERSION }}.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          name: Release v${{ env.NEW_VERSION }}
+          files: ./PullRequestReviewer_${{ env.NEW_VERSION }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
