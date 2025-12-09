@@ -15,8 +15,8 @@ public class GitHubService(
     HttpClient httpClient,
     IOptions<GitHubOptions> gitHubOptions) : IGitHubService
 {
-    private string? _currentUsername;
-    private readonly JsonSerializerOptions _jsonOptions = new()
+    private string? currentUsername;
+    private readonly JsonSerializerOptions jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
@@ -31,7 +31,7 @@ public class GitHubService(
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(gitHubOptions.Value.UserAgent);
         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
-        _currentUsername = null;
+        currentUsername = null;
         logger.LogDebug("GitHub HTTP client initialized with base URL: {BaseUrl}", gitHubOptions.Value.ApiBaseUrl);
     }
 
@@ -82,7 +82,7 @@ public class GitHubService(
             throw new InvalidOperationException($"GitHub API error: {response.StatusCode} - {errorContent}");
         }
 
-        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(_jsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(jsonOptions);
         if (result == null)
         {
             logger.LogWarning("Received null response from GitHub API");
@@ -113,7 +113,7 @@ public class GitHubService(
             throw new InvalidOperationException($"GitHub API error: {response.StatusCode} - {errorContent}");
         }
 
-        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(_jsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(jsonOptions);
         if (result == null)
         {
             logger.LogWarning("Received null response from GitHub API");
@@ -144,7 +144,7 @@ public class GitHubService(
             throw new InvalidOperationException($"GitHub API error: {response.StatusCode} - {errorContent}");
         }
 
-        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(_jsonOptions);
+        var result = await response.Content.ReadFromJsonAsync<GitHubSearchResponse<GitHubIssue>>(jsonOptions);
         if (result == null)
         {
             logger.LogWarning("Received null response from GitHub API");
@@ -177,25 +177,25 @@ public class GitHubService(
 
     private async Task<string> GetCurrentUsernameAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_currentUsername))
+        if (!string.IsNullOrWhiteSpace(currentUsername))
         {
-            logger.LogDebug("Using cached username: {Username}", _currentUsername);
-            return _currentUsername;
+            logger.LogDebug("Using cached username: {Username}", currentUsername);
+            return currentUsername;
         }
 
         logger.LogDebug("Fetching current user information");
         var response = await httpClient.GetAsync($"{gitHubOptions.Value.ApiBaseUrl}/user");
         response.EnsureSuccessStatusCode();
 
-        var user = await response.Content.ReadFromJsonAsync<GitHubUser>(_jsonOptions);
+        var user = await response.Content.ReadFromJsonAsync<GitHubUser>(jsonOptions);
         if (user == null || string.IsNullOrWhiteSpace(user.Login))
         {
             throw new InvalidOperationException("Failed to fetch current user information or username is empty");
         }
 
-        _currentUsername = user.Login;
-        logger.LogInformation("Current user: {Username}", _currentUsername);
-        return _currentUsername;
+        currentUsername = user.Login;
+        logger.LogInformation("Current user: {Username}", currentUsername);
+        return currentUsername;
     }
 
     private async Task<List<PullRequestModel>> ConvertToPullRequestModelsAsync(List<GitHubIssue> issues)
@@ -262,7 +262,7 @@ public class GitHubService(
                 var prUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}";
                 var prResponse = await httpClient.GetAsync(prUrl);
                 prResponse.EnsureSuccessStatusCode();
-                pr = await prResponse.Content.ReadFromJsonAsync<GitHubPullRequest>(_jsonOptions);
+                pr = await prResponse.Content.ReadFromJsonAsync<GitHubPullRequest>(jsonOptions);
             }
             catch (Exception ex)
             {
@@ -295,6 +295,50 @@ public class GitHubService(
                 RequestedReviewers = pr.RequestedReviewers?.Select(r => r.Login).ToList() ?? [],
                 Assignees = issue.Assignees?.Select(a => a.Login).ToList() ?? []
             };
+
+            // Fetch reviews
+            try
+            {
+                var reviewsUrl = $"{gitHubOptions.Value.ApiBaseUrl}/repos/{owner}/{repoName}/pulls/{issue.Number}/reviews";
+                var reviewsResponse = await httpClient.GetAsync(reviewsUrl);
+                reviewsResponse.EnsureSuccessStatusCode();
+                var reviews = await reviewsResponse.Content.ReadFromJsonAsync<List<GitHubReview>>(jsonOptions);
+
+                if (reviews != null && reviews.Count > 0)
+                {
+                    // Calculate review status based on the latest review for each reviewer
+                    var latestReviews = reviews
+                        .GroupBy(r => r.User.Login)
+                        .Select(g => g.OrderByDescending(r => r.SubmittedAt).First())
+                        .ToList();
+
+                    if (latestReviews.Any(r => r.State == "CHANGES_REQUESTED"))
+                    {
+                        model.ReviewStatus = "Changes Requested";
+                    }
+                    else if (latestReviews.Any(r => r.State == "APPROVED"))
+                    {
+                        model.ReviewStatus = "Approved";
+                    }
+                    else if (latestReviews.Any(r => r.State == "COMMENTED"))
+                    {
+                        model.ReviewStatus = "Commented";
+                    }
+                    else
+                    {
+                        model.ReviewStatus = "Review Requested";
+                    }
+                }
+                else
+                {
+                    model.ReviewStatus = "No Reviews";
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to fetch reviews for {Repo}#{Number}", repoFullName, issue.Number);
+                model.ReviewStatus = "Error";
+            }
 
             models.Add(model);
             logger.LogDebug("Converted PR: {Repo}#{Number} - {Title}", repoFullName, issue.Number, issue.Title);
