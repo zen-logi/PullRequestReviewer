@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -378,4 +379,254 @@ public class GitHubService(
             throw new InvalidOperationException("GitHub HTTP client is not initialized. Call SetToken first.");
         }
     }
+
+    #region GraphQL API
+
+    /// <inheritdoc/>
+    public async Task<List<PullRequestModel>> GetAllPullRequestsGraphQlAsync()
+    {
+        logger.LogInformation("Fetching all pull requests via GraphQL API");
+        EnsureHttpClientInitialized();
+
+        var username = await GetCurrentUsernameAsync();
+
+        var query = $@"
+            query($reviewQuery: String!, $assignedQuery: String!, $authoredQuery: String!) {{
+                reviewRequested: search(query: $reviewQuery, type: ISSUE, first: 50) {{
+                    ...SearchFields
+                }}
+                assigned: search(query: $assignedQuery, type: ISSUE, first: 50) {{
+                    ...SearchFields
+                }}
+                authored: search(query: $authoredQuery, type: ISSUE, first: 50) {{
+                    ...SearchFields
+                }}
+            }}
+            {SearchFieldsFragment}
+        ";
+
+        var variables = new Dictionary<string, string>
+        {
+            ["reviewQuery"] = $"review-requested:{username} is:pr is:open",
+            ["assignedQuery"] = $"assignee:{username} is:pr is:open",
+            ["authoredQuery"] = $"author:{username} is:pr is:open"
+        };
+
+        var response = await ExecuteGraphQLAsync<GraphQLAllPullRequestsData>(query, variables);
+
+        if (response == null)
+        {
+            logger.LogWarning("Received null response from GraphQL API");
+            return [];
+        }
+
+        var allPrs = new List<GraphQLPullRequest>();
+        if (response.ReviewRequested?.Nodes != null) allPrs.AddRange(response.ReviewRequested.Nodes);
+        if (response.Assigned?.Nodes != null) allPrs.AddRange(response.Assigned.Nodes);
+        if (response.Authored?.Nodes != null) allPrs.AddRange(response.Authored.Nodes);
+
+        var uniquePrs = allPrs
+            .Where(pr => pr != null)
+            .GroupBy(pr => pr.Id)
+            .Select(g => g.First())
+            .OrderByDescending(pr => pr.UpdatedAt ?? pr.CreatedAt)
+            .ToList();
+
+        logger.LogInformation("Found {Count} unique pull requests via GraphQL", uniquePrs.Count);
+
+        return uniquePrs.Select(ConvertGraphQLToPullRequestModel).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<PullRequestModel>> GetReviewRequestedPullRequestsGraphQlAsync()
+    {
+        logger.LogInformation("Fetching review-requested pull requests via GraphQL API");
+        EnsureHttpClientInitialized();
+        var username = await GetCurrentUsernameAsync();
+        return await ExecuteSingleSearchQueryAsync($"review-requested:{username} is:pr is:open");
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<PullRequestModel>> GetAssignedPullRequestsGraphQlAsync()
+    {
+        logger.LogInformation("Fetching assigned pull requests via GraphQL API");
+        EnsureHttpClientInitialized();
+        var username = await GetCurrentUsernameAsync();
+        return await ExecuteSingleSearchQueryAsync($"assignee:{username} is:pr is:open");
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<PullRequestModel>> GetAuthoredPullRequestsGraphQlAsync()
+    {
+        logger.LogInformation("Fetching authored pull requests via GraphQL API");
+        EnsureHttpClientInitialized();
+        var username = await GetCurrentUsernameAsync();
+        return await ExecuteSingleSearchQueryAsync($"author:{username} is:pr is:open");
+    }
+
+    private async Task<List<PullRequestModel>> ExecuteSingleSearchQueryAsync(string searchQuery)
+    {
+        var query = $@"
+            query($query: String!) {{
+                search(query: $query, type: ISSUE, first: 50) {{
+                    ...SearchFields
+                }}
+            }}
+            {SearchFieldsFragment}
+        ";
+
+        var variables = new Dictionary<string, string> { ["query"] = searchQuery };
+
+        // Single search returns SearchPullRequestsData structure (search -> nodes)
+        var response = await ExecuteGraphQLAsync<SearchPullRequestsData>(query, variables);
+
+        if (response?.Search?.Nodes == null)
+        {
+            logger.LogWarning("Received null response from GraphQL API for single search");
+            return [];
+        }
+
+        return response.Search.Nodes
+            .Select(ConvertGraphQLToPullRequestModel)
+            .OrderByDescending(pr => pr.UpdatedAt ?? pr.CreatedAt)
+            .ToList();
+    }
+
+    private const string SearchFieldsFragment = @"
+        fragment SearchFields on SearchResultItemConnection {
+            issueCount
+            nodes {
+                ... on PullRequest {
+                    id
+                    number
+                    title
+                    url
+                    state
+                    isDraft
+                    createdAt
+                    updatedAt
+                    author { login avatarUrl }
+                    repository { nameWithOwner }
+                    reviews(first: 20, states: [APPROVED, CHANGES_REQUESTED, COMMENTED]) {
+                        nodes { state author { login } }
+                    }
+                    reviewRequests(first: 10) {
+                        nodes { requestedReviewer { ... on User { login } } }
+                    }
+                }
+            }
+        }
+    ";
+
+    /// <summary>
+    /// 指定されたクエリと変数を使用して GraphQL API を実行する。
+    /// </summary>
+    /// <typeparam name="T">レスポンスデータの型。</typeparam>
+    /// <param name="query">GraphQL クエリ文字列。</param>
+    /// <param name="variables">クエリ変数。</param>
+    /// <returns>API から返されたデータ。エラーが発生した場合は例外をスローする。</returns>
+    private async Task<T?> ExecuteGraphQLAsync<T>(string query, Dictionary<string, string> variables) where T : class
+    {
+        var requestBody = new { query, variables };
+        var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        var response = await httpClient.PostAsync(gitHubOptions.Value.GraphQLEndpoint, content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            logger.LogError("GraphQL API returned {StatusCode}: {Content}", response.StatusCode, errorContent);
+            throw new InvalidOperationException($"GraphQL API error: {response.StatusCode} - {errorContent}");
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<T>>(jsonOptions);
+
+        if (result?.Errors?.Count > 0)
+        {
+            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Message));
+            logger.LogError("GraphQL errors: {Errors}", errorMessages);
+            throw new InvalidOperationException($"GraphQL error: {errorMessages}");
+        }
+
+        return result?.Data;
+    }
+
+    /// <summary>
+    /// GraphQL の PR データをアプリケーションのモデルに変換する。
+    /// </summary>
+    /// <param name="pr">GraphQL から取得した PR データ。</param>
+    /// <returns>アプリケーションで使用する PullRequestModel。</returns>
+    private PullRequestModel ConvertGraphQLToPullRequestModel(GraphQLPullRequest pr)
+    {
+        var reviewStatus = CalculateGraphQLReviewStatus(pr);
+
+        return new PullRequestModel
+        {
+            Id = pr.Id.GetHashCode(),
+            Number = pr.Number,
+            Title = pr.Title,
+            HtmlUrl = pr.Url,
+            State = pr.IsDraft ? "draft" : pr.State.ToLowerInvariant(),
+            RepositoryFullName = pr.Repository?.NameWithOwner ?? "",
+            AuthorLogin = pr.Author?.Login ?? "unknown",
+            AuthorAvatarUrl = pr.Author?.AvatarUrl ?? "",
+            CreatedAt = pr.CreatedAt,
+            UpdatedAt = pr.UpdatedAt,
+            ReviewStatus = reviewStatus,
+            ReviewStatusColor = GetGraphQLReviewStatusColor(reviewStatus)
+        };
+    }
+
+    /// <summary>
+    /// PR のレビュー状態（承認、変更要求など）を計算する。
+    /// </summary>
+    /// <param name="pr">GraphQL から取得した PR データ。</param>
+    /// <returns>レビュー状態を表す文字列。</returns>
+    private static string CalculateGraphQLReviewStatus(GraphQLPullRequest pr)
+    {
+        var reviews = pr.Reviews?.Nodes ?? [];
+
+        if (reviews.Count == 0)
+        {
+            var pendingReviewers = pr.ReviewRequests?.Nodes?.Count ?? 0;
+            return pendingReviewers > 0 ? "Pending" : "No reviews";
+        }
+
+        var latestReviews = reviews
+            .Where(r => r.Author != null)
+            .GroupBy(r => r.Author!.Login)
+            .Select(g => g.Last())
+            .ToList();
+
+        var approved = latestReviews.Count(r => r.State == "APPROVED");
+        var changesRequested = latestReviews.Count(r => r.State == "CHANGES_REQUESTED");
+        var commented = latestReviews.Count(r => r.State == "COMMENTED");
+
+        if (changesRequested > 0)
+            return "Changes requested";
+        if (approved > 0)
+            return "Approved";
+        if (commented > 0)
+            return "Commented";
+
+        return "Pending";
+    }
+
+    /// <summary>
+    /// レビュー状態に対応する表示色を取得する。
+    /// </summary>
+    /// <param name="status">レビュー状態。</param>
+    /// <returns>16進数カラーコード。</returns>
+    private static string GetGraphQLReviewStatusColor(string status)
+    {
+        if (status.StartsWith("Approved"))
+            return "#28a745";
+        if (status.StartsWith("Changes requested"))
+            return "#d73a49";
+        if (status.StartsWith("Commented"))
+            return "#6f42c1";
+        return "#6a737d";
+    }
+
+    #endregion
 }

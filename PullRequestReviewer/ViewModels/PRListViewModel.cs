@@ -152,10 +152,10 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
         {
             var prs = CurrentFilter switch
             {
-                PullRequestFilterType.All => await gitHubService.GetAllPullRequestsAsync(),
-                PullRequestFilterType.ReviewRequested => await gitHubService.GetReviewRequestedPullRequestsAsync(),
-                PullRequestFilterType.Assigned => await gitHubService.GetAssignedPullRequestsAsync(),
-                PullRequestFilterType.Authored => await gitHubService.GetAuthoredPullRequestsAsync(),
+                PullRequestFilterType.All => await gitHubService.GetAllPullRequestsGraphQlAsync(),
+                PullRequestFilterType.ReviewRequested => await gitHubService.GetReviewRequestedPullRequestsGraphQlAsync(),
+                PullRequestFilterType.Assigned => await gitHubService.GetAssignedPullRequestsGraphQlAsync(),
+                PullRequestFilterType.Authored => await gitHubService.GetAuthoredPullRequestsGraphQlAsync(),
                 _ => new List<PullRequestModel>()
             };
 
@@ -227,4 +227,3 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
         await Shell.Current.GoToAsync("TokenSettingPage");
     }
 }
-

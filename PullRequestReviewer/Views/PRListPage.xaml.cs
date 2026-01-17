@@ -40,4 +40,3 @@ public partial class PRListPage : ContentPage
         ToggleSidebarButton.Text = _isSidebarVisible ? "☰" : "☰";
     }
 }
-
