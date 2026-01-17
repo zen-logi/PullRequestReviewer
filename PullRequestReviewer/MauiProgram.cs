@@ -27,8 +27,6 @@ public static class MauiProgram
         startup.Configure(builder.Logging, config);
         startup.ConfigureServices(builder.Services, config);
 
-        builder.Services.AddSingleton<Services.IUpdateService, Services.UpdateService>();
-
         return builder.Build();
     }
 }

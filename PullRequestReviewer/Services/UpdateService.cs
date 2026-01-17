@@ -4,13 +4,9 @@ using Microsoft.Extensions.Logging;
 namespace PullRequestReviewer.Services;
 
 /// <inheritdoc />
-public class UpdateService(ILogger<UpdateService> logger) : IUpdateService
+public class UpdateService(ILogger<UpdateService> logger, IHttpClientFactory httpClientFactory) : IUpdateService
 {
     private const string GitHubApiUrl = "https://api.github.com/repos/zen-logi/PullRequestReviewer/releases/latest";
-    private readonly HttpClient httpClient = new()
-    {
-        DefaultRequestHeaders = { { "User-Agent", "PullRequestReviewer-App" } }
-    };
 
     public string? LatestVersion { get; private set; }
     public string? ReleaseUrl { get; private set; }
@@ -21,6 +17,7 @@ public class UpdateService(ILogger<UpdateService> logger) : IUpdateService
         try
         {
             logger.LogInformation("Checking for updates...");
+            var httpClient = httpClientFactory.CreateClient("UpdateService");
             var release = await httpClient.GetFromJsonAsync<GitHubRelease>(GitHubApiUrl);
 
             if (release != null)
