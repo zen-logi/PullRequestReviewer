@@ -24,6 +24,20 @@ public class Startup
                 client.Timeout = TimeSpan.FromSeconds(options.RequestTimeout);
             });
 
+        // Register UpdateService with named HttpClient
+        services.AddHttpClient("UpdateService", client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PullRequestReviewer-App");
+        });
+        services.AddSingleton<IUpdateService, UpdateService>();
+
+        // Register GitHubAuthService with named HttpClient
+        services.AddHttpClient("GitHubAuth", client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PullRequestReviewer-App");
+        });
+        services.AddSingleton<IGitHubAuthService, GitHubAuthService>();
+
         // Register ViewModels
         services.AddTransient<TokenSettingViewModel>();
         services.AddTransient<PRListViewModel>();

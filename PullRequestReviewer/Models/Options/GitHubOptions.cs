@@ -6,5 +6,15 @@ public sealed class GitHubOptions
 
     public required string ApiBaseUrl { get; init; }
     public required string UserAgent { get; init; }
+    public string GraphQLEndpoint { get; init; } = "https://api.github.com/graphql";
     public int RequestTimeout { get; init; } = 30;
+    public OAuthOptions OAuth { get; init; } = new();
+}
+
+public sealed class OAuthOptions
+{
+    public string ClientId { get; init; } = string.Empty;
+    public string DeviceCodeUrl { get; init; } = "https://github.com/login/device/code";
+    public string AccessTokenUrl { get; init; } = "https://github.com/login/oauth/access_token";
+    public string Scopes { get; init; } = "repo";
 }

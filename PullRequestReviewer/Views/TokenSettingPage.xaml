@@ -5,7 +5,7 @@
              xmlns:converters="clr-namespace:PullRequestReviewer.Converters"
              x:Class="PullRequestReviewer.Views.TokenSettingPage"
              x:DataType="viewmodels:TokenSettingViewModel"
-             Title="GitHub Token Settings">
+             Title="Settings">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -16,87 +16,234 @@
     </ContentPage.Resources>
 
     <ScrollView>
-        <VerticalStackLayout Spacing="20" Padding="30" VerticalOptions="Center">
+        <VerticalStackLayout Spacing="20" Padding="30" MaximumWidthRequest="600" HorizontalOptions="Center">
 
-            <Label Text="GitHub Personal Access Token"
-                   FontSize="24"
+            <!-- Title -->
+            <Label Text="GitHub Authentication"
+                   FontSize="28"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
-                   Margin="0,0,0,20"/>
+                   Margin="0,0,0,10"/>
 
-            <Label Text="To use this app, you need a GitHub Personal Access Token with 'repo' scope."
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center"
-                   TextColor="{DynamicResource Gray600}"/>
-
-            <Border Stroke="{DynamicResource Primary}"
+            <!-- Logged In State -->
+            <Border IsVisible="{Binding IsOAuthLoggedIn}"
+                    Stroke="{DynamicResource Primary}"
                     StrokeThickness="2"
-                    Background="Transparent"
-                    Padding="10"
-                    Margin="0,20,0,0"
-                    StrokeShape="RoundRectangle 8">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <Entry Grid.Column="0"
-                           Text="{Binding Token}"
-                           Placeholder="Enter your GitHub token"
-                           IsPassword="True"
-                           VerticalOptions="Center"/>
-
-                    <Button Grid.Column="1"
-                            Text="Generate Token"
-                            Command="{Binding GenerateTokenCommand}"
-                            VerticalOptions="Center"
-                            Padding="15,8"/>
-                </Grid>
+                    StrokeShape="RoundRectangle 12"
+                    Padding="20"
+                    BackgroundColor="{DynamicResource Gray100}">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="✓ Logged in with GitHub"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="{DynamicResource Primary}"
+                           HorizontalOptions="Center"/>
+                    <Label Text="{Binding OAuthUsername, StringFormat='Signed in as: {0}'}"
+                           FontSize="16"
+                           HorizontalOptions="Center"
+                           TextColor="{DynamicResource Gray600}"/>
+                    <Button Text="Logout"
+                            Command="{Binding LogoutCommand}"
+                            BackgroundColor="{DynamicResource Gray400}"
+                            TextColor="White"
+                            HorizontalOptions="Center"
+                            Padding="30,10"/>
+                </VerticalStackLayout>
             </Border>
 
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,20,0,0">
-                <Button Grid.Column="0"
-                        Text="Save Token"
-                        Command="{Binding SaveTokenCommand}"
-                        IsEnabled="{Binding IsValidating, Converter={StaticResource InvertedBoolConverter}}"
-                        Padding="0,12"
-                        FontSize="16"
-                        FontAttributes="Bold"/>
+            <!-- Auth Method Selection (when not logged in) -->
+            <VerticalStackLayout IsVisible="{Binding IsOAuthLoggedIn, Converter={StaticResource InvertedBoolConverter}}" Spacing="20">
 
-                <Button Grid.Column="1"
-                        Text="Reset Token"
-                        Command="{Binding ResetTokenCommand}"
-                        IsEnabled="{Binding IsValidating, Converter={StaticResource InvertedBoolConverter}}"
-                        Padding="0,12"
-                        FontSize="16"
-                        BackgroundColor="{DynamicResource Gray300}"
-                        TextColor="{DynamicResource Gray900}"/>
-            </Grid>
+                <!-- Login Options Header -->
+                <Label Text="Choose how to connect to GitHub:"
+                       FontSize="16"
+                       HorizontalOptions="Center"
+                       TextColor="{DynamicResource Gray600}"/>
 
-            <ActivityIndicator IsRunning="{Binding IsValidating}"
-                              IsVisible="{Binding IsValidating}"
-                              Color="{DynamicResource Primary}"
-                              Margin="0,10,0,0"/>
+                <!-- Auth Method Tabs -->
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                    <Button Text="🔐 Login with GitHub"
+                            Command="{Binding SwitchToOAuthCommand}"
+                            Padding="20,10"/>
+                    <Button Text="🔑 Use Personal Token"
+                            Command="{Binding SwitchToPATCommand}"
+                            BackgroundColor="{DynamicResource Gray300}"
+                            TextColor="{DynamicResource Gray900}"
+                            Padding="20,10"/>
+                </HorizontalStackLayout>
 
-            <Label Text="{Binding StatusMessage}"
-                   IsVisible="{Binding StatusMessage, Converter={StaticResource StringNotEmptyConverter}}"
-                   TextColor="{Binding IsError, Converter={StaticResource ErrorColorConverter}}"
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center"
-                   Margin="0,10,0,0"/>
+                <!-- OAuth Section -->
+                <Border IsVisible="{Binding ShowOAuthSection}"
+                        Stroke="{DynamicResource Gray300}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12"
+                        Padding="20"
+                        Margin="0,10,0,0">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Login with GitHub"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
 
-            <VerticalStackLayout Spacing="10" Margin="0,30,0,0">
-                <Label Text="How to generate a token:"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource Gray600}"/>
-                <Label Text="1. Click 'Generate Token' button above"
-                       TextColor="{DynamicResource Gray600}"/>
-                <Label Text="2. Sign in to GitHub if needed"
-                       TextColor="{DynamicResource Gray600}"/>
-                <Label Text="3. Review the permissions and click 'Generate token'"
-                       TextColor="{DynamicResource Gray600}"/>
-                <Label Text="4. Copy the token and paste it in the field above"
-                       TextColor="{DynamicResource Gray600}"/>
+                        <Label Text="Click the button below to sign in with your GitHub account. A browser window will open for authentication."
+                               HorizontalTextAlignment="Center"
+                               TextColor="{DynamicResource Gray600}"/>
+
+                        <!-- Start Login Button -->
+                        <Button Text="Sign in with GitHub"
+                                Command="{Binding StartOAuthLoginCommand}"
+                                IsVisible="{Binding IsOAuthLoggingIn, Converter={StaticResource InvertedBoolConverter}}"
+                                BackgroundColor="{DynamicResource Primary}"
+                                TextColor="White"
+                                FontSize="16"
+                                Padding="20,12"
+                                HorizontalOptions="Center"/>
+
+                        <!-- OAuth Login Progress -->
+                        <VerticalStackLayout IsVisible="{Binding IsOAuthLoggingIn}" Spacing="15">
+                            <ActivityIndicator IsRunning="{Binding IsOAuthLoggingIn}"
+                                               Color="{DynamicResource Primary}"/>
+
+                            <!-- User Code Display -->
+                            <Border IsVisible="{Binding OAuthUserCode, Converter={StaticResource StringNotEmptyConverter}}"
+                                    Stroke="{DynamicResource Primary}"
+                                    StrokeThickness="2"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="20,15"
+                                    BackgroundColor="{DynamicResource Gray100}"
+                                    HorizontalOptions="Center">
+                                <VerticalStackLayout Spacing="10">
+                                    <Label Text="Enter this code:"
+                                           FontSize="14"
+                                           HorizontalOptions="Center"
+                                           TextColor="{DynamicResource Gray600}"/>
+                                    <Label Text="{Binding OAuthUserCode}"
+                                           FontSize="28"
+                                           FontAttributes="Bold"
+                                           HorizontalOptions="Center"
+                                           TextColor="{DynamicResource Primary}"
+                                           CharacterSpacing="4"/>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Label Text="{Binding OAuthVerificationUrl}"
+                                   IsVisible="{Binding OAuthVerificationUrl, Converter={StaticResource StringNotEmptyConverter}}"
+                                   FontSize="14"
+                                   HorizontalOptions="Center"
+                                   TextColor="{DynamicResource Gray600}"/>
+
+                            <Label Text="{Binding OAuthStatusMessage}"
+                                   IsVisible="{Binding OAuthStatusMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="{DynamicResource Gray600}"/>
+
+                            <Button Text="Cancel"
+                                    Command="{Binding CancelOAuthLoginCommand}"
+                                    BackgroundColor="{DynamicResource Gray300}"
+                                    TextColor="{DynamicResource Gray900}"
+                                    HorizontalOptions="Center"
+                                    Padding="20,8"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- PAT Section -->
+                <Border IsVisible="{Binding ShowPATSection}"
+                        Stroke="{DynamicResource Gray300}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12"
+                        Padding="20"
+                        Margin="0,10,0,0">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Personal Access Token"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+
+                        <Label Text="Enter a GitHub Personal Access Token with 'repo' scope."
+                               HorizontalTextAlignment="Center"
+                               TextColor="{DynamicResource Gray600}"/>
+
+                        <Border Stroke="{DynamicResource Primary}"
+                                StrokeThickness="1"
+                                Background="Transparent"
+                                Padding="10"
+                                StrokeShape="RoundRectangle 8">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Entry Grid.Column="0"
+                                       Text="{Binding Token}"
+                                       Placeholder="Enter your GitHub token"
+                                       IsPassword="True"
+                                       VerticalOptions="Center"/>
+
+                                <Button Grid.Column="1"
+                                        Text="Generate"
+                                        Command="{Binding GenerateTokenCommand}"
+                                        VerticalOptions="Center"
+                                        Padding="15,8"/>
+                            </Grid>
+                        </Border>
+
+                        <Button Text="Save Token"
+                                Command="{Binding SaveTokenCommand}"
+                                IsEnabled="{Binding IsValidating, Converter={StaticResource InvertedBoolConverter}}"
+                                BackgroundColor="{DynamicResource Primary}"
+                                TextColor="White"
+                                FontSize="16"
+                                Padding="20,12"
+                                HorizontalOptions="Center"/>
+
+                        <ActivityIndicator IsRunning="{Binding IsValidating}"
+                                          IsVisible="{Binding IsValidating}"
+                                          Color="{DynamicResource Primary}"/>
+
+                        <Label Text="{Binding StatusMessage}"
+                               IsVisible="{Binding StatusMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                               TextColor="{Binding IsError, Converter={StaticResource ErrorColorConverter}}"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"/>
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
 
             <BoxView HeightRequest="1" Color="{DynamicResource Gray300}" Margin="0,20"/>
 
+            <!-- Auto-Refresh Settings -->
+            <Label Text="Auto-Refresh Settings"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,10"/>
+
+            <Label Text="Set the interval (in minutes) for automatic refresh. Set to 0 to disable."
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   TextColor="{DynamicResource Gray600}"
+                   Margin="0,0,0,15"/>
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                <Label Text="Refresh every"
+                       VerticalOptions="Center"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Border Stroke="{DynamicResource Primary}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 4"
+                        Padding="8,4"
+                        WidthRequest="80">
+                    <Entry Text="{Binding AutoRefreshInterval}"
+                           Keyboard="Numeric"
+                           HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+                <Label Text="minutes"
+                       VerticalOptions="Center"
+                       TextColor="{DynamicResource Gray600}"/>
+            </HorizontalStackLayout>
+
+            <BoxView HeightRequest="1" Color="{DynamicResource Gray300}" Margin="0,20"/>
+
+            <!-- Application Updates -->
             <Label Text="Application Updates"
                    FontSize="20"
                    FontAttributes="Bold"

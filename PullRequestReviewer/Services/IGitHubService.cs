@@ -36,4 +36,24 @@ public interface IGitHubService
     /// GitHubトークンを設定する。
     /// </summary>
     void SetToken(string token);
+
+    /// <summary>
+    /// GraphQL APIを使用して全てのプルリクエストを取得する。
+    /// </summary>
+    Task<List<PullRequestModel>> GetAllPullRequestsGraphQlAsync();
+
+    /// <summary>
+    /// GraphQL APIを使用してレビュー依頼されたプルリクエストを取得する。
+    /// </summary>
+    Task<List<PullRequestModel>> GetReviewRequestedPullRequestsGraphQlAsync();
+
+    /// <summary>
+    /// GraphQL APIを使用して担当者として割り当てられたプルリクエストを取得する。
+    /// </summary>
+    Task<List<PullRequestModel>> GetAssignedPullRequestsGraphQlAsync();
+
+    /// <summary>
+    /// GraphQL APIを使用して作成したプルリクエストを取得する。
+    /// </summary>
+    Task<List<PullRequestModel>> GetAuthoredPullRequestsGraphQlAsync();
 }

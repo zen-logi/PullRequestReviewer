@@ -100,15 +100,22 @@ public class PullRequestModel
     /// </summary>
     public string? ReviewStatus { get; set; }
 
+    private string? _reviewStatusColor;
+
     /// <summary>
-    /// Gets the color associated with the review status.
+    /// Gets or sets the color associated with the review status.
+    /// If not explicitly set, calculates based on ReviewStatus.
     /// </summary>
-    public string ReviewStatusColor => ReviewStatus switch
+    public string ReviewStatusColor
     {
-        "Approved" => "#28a745", // Green
-        "Changes Requested" => "#dc3545", // Red
-        "Review Requested" => "#e36209", // Orange
-        "Commented" => "#17a2b8", // Blue
-        _ => "#6c757d" // Gray
-    };
+        get => _reviewStatusColor ?? ReviewStatus switch
+        {
+            "Approved" => "#28a745", // Green
+            "Changes Requested" => "#dc3545", // Red
+            "Review Requested" => "#e36209", // Orange
+            "Commented" => "#17a2b8", // Blue
+            _ => "#6c757d" // Gray
+        };
+        set => _reviewStatusColor = value;
+    }
 }

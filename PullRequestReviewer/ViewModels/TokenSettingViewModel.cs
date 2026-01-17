@@ -1,7 +1,7 @@
-﻿using System.Windows.Input;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using PullRequestReviewer.Models;
 using PullRequestReviewer.Services;
 
 namespace PullRequestReviewer.ViewModels;
@@ -9,10 +9,13 @@ namespace PullRequestReviewer.ViewModels;
 public partial class TokenSettingViewModel(
     ISettingsService settingsService,
     IGitHubService gitHubService,
+    IGitHubAuthService gitHubAuthService,
     IUpdateService updateService,
     ILogger<TokenSettingViewModel> logger) : ObservableObject
 {
+    private CancellationTokenSource? _oauthPollCts;
 
+    // PAT Authentication
     [ObservableProperty]
     private string _token = string.Empty;
 
@@ -25,6 +28,33 @@ public partial class TokenSettingViewModel(
     [ObservableProperty]
     private bool _isError;
 
+    // OAuth Authentication
+    [ObservableProperty]
+    private bool _isOAuthLoggedIn;
+
+    [ObservableProperty]
+    private string _oAuthUsername = string.Empty;
+
+    [ObservableProperty]
+    private bool _isOAuthLoggingIn;
+
+    [ObservableProperty]
+    private string _oAuthUserCode = string.Empty;
+
+    [ObservableProperty]
+    private string _oAuthVerificationUrl = string.Empty;
+
+    [ObservableProperty]
+    private string _oAuthStatusMessage = string.Empty;
+
+    // Auth method selection
+    [ObservableProperty]
+    private bool _showPATSection;
+
+    [ObservableProperty]
+    private bool _showOAuthSection = true;
+
+    // Update checking
     [ObservableProperty]
     private bool _isCheckingUpdate;
 
@@ -34,18 +64,179 @@ public partial class TokenSettingViewModel(
     [ObservableProperty]
     private bool _isUpdateAvailable;
 
+    [ObservableProperty]
+    private int _autoRefreshInterval;
+
     public async Task InitializeAsync()
     {
         logger.LogInformation("Initializing token settings view");
-        var savedToken = await settingsService.GetGitHubTokenAsync();
-        if (!string.IsNullOrWhiteSpace(savedToken))
+
+        // Load current auth method
+        var authMethod = settingsService.GetAuthMethod();
+        logger.LogDebug("Current auth method: {AuthMethod}", authMethod);
+
+        if (authMethod == AuthMethod.OAuth)
         {
-            logger.LogDebug("Found saved token");
-            Token = savedToken;
+            var oauthToken = await settingsService.GetOAuthAccessTokenAsync();
+            if (!string.IsNullOrEmpty(oauthToken))
+            {
+                IsOAuthLoggedIn = true;
+                OAuthUsername = settingsService.GetOAuthUsername() ?? "Unknown";
+                ShowOAuthSection = true;
+                ShowPATSection = false;
+            }
         }
-        else
+        else if (authMethod == AuthMethod.PersonalAccessToken)
         {
-            logger.LogDebug("No saved token found");
+            var savedToken = await settingsService.GetGitHubTokenAsync();
+            if (!string.IsNullOrWhiteSpace(savedToken))
+            {
+                Token = savedToken;
+                ShowPATSection = true;
+                ShowOAuthSection = false;
+            }
+        }
+
+        // Load auto-refresh interval
+        AutoRefreshInterval = settingsService.GetAutoRefreshInterval();
+        logger.LogDebug("Loaded auto-refresh interval: {Interval} minutes", AutoRefreshInterval);
+    }
+
+    partial void OnAutoRefreshIntervalChanged(int value)
+    {
+        settingsService.SetAutoRefreshInterval(value);
+        logger.LogInformation("Auto-refresh interval saved: {Interval} minutes", value);
+    }
+
+    [RelayCommand]
+    private void SwitchToOAuth()
+    {
+        ShowOAuthSection = true;
+        ShowPATSection = false;
+    }
+
+    [RelayCommand]
+    private void SwitchToPAT()
+    {
+        ShowPATSection = true;
+        ShowOAuthSection = false;
+    }
+
+    [RelayCommand]
+    private async Task StartOAuthLoginAsync()
+    {
+        if (IsOAuthLoggingIn) return;
+
+        IsOAuthLoggingIn = true;
+        OAuthStatusMessage = "Starting login...";
+        OAuthUserCode = string.Empty;
+        OAuthVerificationUrl = string.Empty;
+
+        try
+        {
+            logger.LogInformation("Starting OAuth Device Flow");
+            var deviceFlow = await gitHubAuthService.StartDeviceFlowAsync();
+
+            OAuthUserCode = deviceFlow.UserCode;
+            OAuthVerificationUrl = deviceFlow.VerificationUri;
+            OAuthStatusMessage = "Enter the code above at the URL below, then wait for authentication to complete.";
+
+            // Open browser
+            await Browser.OpenAsync(deviceFlow.VerificationUri, BrowserLaunchMode.SystemPreferred);
+
+            // Start polling in background
+            _oauthPollCts = new CancellationTokenSource();
+            var accessToken = await gitHubAuthService.PollForAccessTokenAsync(
+                deviceFlow.DeviceCode,
+                deviceFlow.Interval,
+                deviceFlow.ExpiresIn,
+                _oauthPollCts.Token);
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                // Get username
+                var username = await gitHubAuthService.GetUsernameAsync(accessToken);
+
+                // Save credentials
+                await settingsService.SaveOAuthAccessTokenAsync(accessToken);
+                settingsService.SetAuthMethod(AuthMethod.OAuth);
+                settingsService.SetOAuthUsername(username);
+
+                // Update UI
+                IsOAuthLoggedIn = true;
+                OAuthUsername = username ?? "Unknown";
+                OAuthUserCode = string.Empty;
+                OAuthVerificationUrl = string.Empty;
+                OAuthStatusMessage = "Login successful!";
+
+                // Set token for GitHubService
+                gitHubService.SetToken(accessToken);
+
+                logger.LogInformation("OAuth login successful for user: {Username}", username);
+
+                await Task.Delay(1000);
+                await Shell.Current.GoToAsync("..");
+            }
+            else
+            {
+                OAuthStatusMessage = "Login failed or timed out. Please try again.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            OAuthStatusMessage = "Login cancelled.";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "OAuth login failed");
+            OAuthStatusMessage = $"Login failed: {ex.Message}";
+        }
+        finally
+        {
+            IsOAuthLoggingIn = false;
+            _oauthPollCts?.Dispose();
+            _oauthPollCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOAuthLogin()
+    {
+        _oauthPollCts?.Cancel();
+    }
+
+    [RelayCommand]
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            logger.LogInformation("Logging out");
+
+            bool result = await Shell.Current.DisplayAlertAsync(
+                "Logout",
+                "Are you sure you want to logout? You will need to login again to continue using the app.",
+                "Logout",
+                "Cancel");
+
+            if (result)
+            {
+                await settingsService.ClearAllAuthAsync();
+
+                // Reset UI state
+                IsOAuthLoggedIn = false;
+                OAuthUsername = string.Empty;
+                Token = string.Empty;
+                StatusMessage = "Logged out successfully";
+                IsError = false;
+
+                logger.LogInformation("Logout successful");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during logout");
+            StatusMessage = $"Error: {ex.Message}";
+            IsError = true;
         }
     }
 
@@ -96,68 +287,6 @@ public partial class TokenSettingViewModel(
         await Browser.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
     }
 
-    [RelayCommand]
-    private async Task ResetTokenAsync()
-    {
-        try
-        {
-            logger.LogInformation("Resetting GitHub token");
-
-            bool result;
-            if (Shell.Current != null)
-            {
-                result = await Shell.Current.DisplayAlertAsync(
-                    "Reset Token",
-                    "Are you sure you want to reset your GitHub token? You will need to enter a new token to continue using the app.",
-                    "Reset",
-                    "Cancel");
-            }
-            else if (Application.Current?.Windows.Count > 0)
-            {
-                var page = Application.Current.Windows[0].Page;
-                if (page == null)
-                {
-                    logger.LogError("Unable to show confirmation dialog: no page available");
-                    StatusMessage = "Error: Unable to show confirmation dialog";
-                    IsError = true;
-                    return;
-                }
-                result = await page.DisplayAlertAsync(
-                    "Reset Token",
-                    "Are you sure you want to reset your GitHub token? You will need to enter a new token to continue using the app.",
-                    "Reset",
-                    "Cancel");
-            }
-            else
-            {
-                logger.LogError("Unable to show confirmation dialog: Shell.Current and Application.Current.Windows are null");
-                StatusMessage = "Error: Unable to show confirmation dialog";
-                IsError = true;
-                return;
-            }
-
-            if (result)
-            {
-                logger.LogInformation("User confirmed token reset");
-                await settingsService.ClearGitHubTokenAsync();
-                Token = string.Empty;
-                StatusMessage = "Token has been reset";
-                IsError = false;
-                logger.LogInformation("Token reset successfully");
-            }
-            else
-            {
-                logger.LogInformation("User cancelled token reset");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error resetting token");
-            StatusMessage = $"Error resetting token: {ex.Message}";
-            IsError = true;
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanSaveToken))]
     private async Task SaveTokenAsync()
     {
@@ -174,6 +303,7 @@ public partial class TokenSettingViewModel(
             {
                 logger.LogInformation("Token validation successful, saving token");
                 await settingsService.SaveGitHubTokenAsync(Token);
+                settingsService.SetAuthMethod(AuthMethod.PersonalAccessToken);
                 gitHubService.SetToken(Token);
                 StatusMessage = "Token saved successfully!";
                 IsError = false;

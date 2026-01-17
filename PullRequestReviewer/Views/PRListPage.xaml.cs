@@ -19,12 +19,17 @@ public partial class PRListPage : ContentPage
     {
         base.OnAppearing();
 
-        // Only initialize once, or when returning from settings page
-        if (!_hasInitialized || _viewModel.PullRequests.Count == 0)
-        {
-            await _viewModel.InitializeAsync();
-            _hasInitialized = true;
-        }
+        System.Diagnostics.Debug.WriteLine($"[PRListPage] OnAppearing - hasInitialized: {_hasInitialized}, PRCount: {_viewModel.PullRequests.Count}");
+
+        // 常に InitializeAsync を呼ぶ（認証状態が変わった可能性があるため）
+        await _viewModel.InitializeAsync();
+        _hasInitialized = true;
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.StopAutoRefresh();
     }
 
     private void OnToggleSidebarClicked(object sender, EventArgs e)

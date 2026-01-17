@@ -13,6 +13,7 @@
             <converters:FilterTypeToColorConverter x:Key="FilterTypeToColorConverter"/>
             <converters:FilterTypeToTextColorConverter x:Key="FilterTypeToTextColorConverter"/>
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -160,13 +161,6 @@
                             Command="{Binding RefreshCommand}">
                     <ScrollView>
                         <VerticalStackLayout>
-                            <!-- Loading Indicator -->
-                            <ActivityIndicator IsRunning="{Binding IsLoading}"
-                                             IsVisible="{Binding IsLoading}"
-                                             Color="{DynamicResource Primary}"
-                                             VerticalOptions="Center"
-                                             HorizontalOptions="Center"
-                                             Margin="0,50,0,0"/>
 
                             <!-- Error Message -->
                             <Label Text="{Binding ErrorMessage}"
@@ -288,6 +282,76 @@
                     </ScrollView>
                 </RefreshView>
             </Grid>
+        </Grid>
+
+        <!-- Refresh Button - FAB Style -->
+        <Border StrokeThickness="0"
+                StrokeShape="RoundRectangle 28"
+                WidthRequest="56"
+                HeightRequest="56"
+                BackgroundColor="{DynamicResource Primary}"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="20"
+                ZIndex="1000">
+            <Border.Shadow>
+                <Shadow Brush="Black"
+                        Offset="0,4"
+                        Radius="8"
+                        Opacity="0.3" />
+            </Border.Shadow>
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding RefreshCommand}" />
+            </Border.GestureRecognizers>
+            <Label Text="🔄"
+                   FontSize="24"
+                   TextColor="White"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="1.0" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.5" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border.Triggers>
+                <DataTrigger TargetType="Border" Binding="{Binding IsLoading}" Value="True">
+                    <Setter Property="IsEnabled" Value="False" />
+                    <Setter Property="Opacity" Value="0.5" />
+                </DataTrigger>
+            </Border.Triggers>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Grid IsVisible="{Binding IsLoading}"
+              BackgroundColor="#40000000"
+              ZIndex="2000"
+              HorizontalOptions="Fill"
+              VerticalOptions="Fill"
+              InputTransparent="False">
+            <Border BackgroundColor="White"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="20"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center">
+                <VerticalStackLayout Spacing="10">
+                    <ActivityIndicator IsRunning="{Binding IsLoading}"
+                                      Color="{DynamicResource Primary}"
+                                      WidthRequest="50"
+                                      HeightRequest="50"/>
+                    <Label Text="Loading..."
+                           TextColor="{DynamicResource Gray900}"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
         </Grid>
 
     </Grid>
