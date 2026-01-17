@@ -31,6 +31,13 @@ public class Startup
         });
         services.AddSingleton<IUpdateService, UpdateService>();
 
+        // Register GitHubAuthService with named HttpClient
+        services.AddHttpClient("GitHubAuth", client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PullRequestReviewer-App");
+        });
+        services.AddSingleton<IGitHubAuthService, GitHubAuthService>();
+
         // Register ViewModels
         services.AddTransient<TokenSettingViewModel>();
         services.AddTransient<PRListViewModel>();

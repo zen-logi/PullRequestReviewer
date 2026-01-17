@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -26,13 +26,16 @@ public class GitHubService(
     {
         logger.LogInformation("Setting GitHub token");
         httpClient.DefaultRequestHeaders.Clear();
-        // Use "token" scheme for Personal Access Tokens (not "Bearer")
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", token);
+
+        // OAuth トークン (gho_) と PAT (ghp_) の両方で Bearer スキームを使用
+        var scheme = "Bearer";
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(scheme, token);
+
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(gitHubOptions.Value.UserAgent);
         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         currentUsername = null;
-        logger.LogDebug("GitHub HTTP client initialized with base URL: {BaseUrl}", gitHubOptions.Value.ApiBaseUrl);
+        logger.LogDebug("GitHub HTTP client initialized with scheme: {Scheme}, base URL: {BaseUrl}", scheme, gitHubOptions.Value.ApiBaseUrl);
     }
 
     /// <inheritdoc />
@@ -43,7 +46,7 @@ public class GitHubService(
             logger.LogDebug("Validating GitHub token");
 
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{gitHubOptions.Value.ApiBaseUrl}/user");
-            // Use "token" scheme for Personal Access Tokens (not "Bearer")
+            // トークン検証用にリクエストを作成
             request.Headers.Authorization = new AuthenticationHeaderValue("token", token);
             request.Headers.UserAgent.ParseAdd(gitHubOptions.Value.UserAgent);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
@@ -201,10 +204,10 @@ public class GitHubService(
     private async Task<List<PullRequestModel>> ConvertToPullRequestModelsAsync(List<GitHubIssue> issues)
     {
         logger.LogDebug("Converting {Count} issues to PR models", issues.Count);
-        
+
         // Use SemaphoreSlim to limit concurrency (e.g., 5 simultaneous requests)
         using var semaphore = new SemaphoreSlim(5);
-        
+
         var tasks = issues.Select(async issue =>
         {
             await semaphore.WaitAsync();
@@ -218,7 +221,7 @@ public class GitHubService(
 
                 // Extract repository info
                 string owner, repoName;
-                try 
+                try
                 {
                     if (issue.Repository != null && !string.IsNullOrEmpty(issue.Repository.FullName))
                     {
@@ -235,7 +238,7 @@ public class GitHubService(
 
                         var uri = new Uri(targetUrl);
                         var segments = uri.Segments.Where(s => s != "/").Select(s => s.TrimEnd('/')).ToArray();
-                        
+
                         // Expected format .../repos/owner/repo or .../owner/repo/...
                         if (targetUrl.Contains("/repos/"))
                         {

@@ -161,13 +161,6 @@
                             Command="{Binding RefreshCommand}">
                     <ScrollView>
                         <VerticalStackLayout>
-                            <!-- Loading Indicator -->
-                            <ActivityIndicator IsRunning="{Binding IsLoading}"
-                                             IsVisible="{Binding IsLoading}"
-                                             Color="{DynamicResource Primary}"
-                                             VerticalOptions="Center"
-                                             HorizontalOptions="Center"
-                                             Margin="0,50,0,0"/>
 
                             <!-- Error Message -->
                             <Label Text="{Binding ErrorMessage}"

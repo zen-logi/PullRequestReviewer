@@ -32,15 +32,50 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
     public async Task InitializeAsync()
     {
         logger.LogInformation("Initializing PR list view");
-        var token = await settingsService.GetGitHubTokenAsync();
+
+        // Get token based on auth method
+        string? token = null;
+        var authMethod = settingsService.GetAuthMethod();
+        logger.LogDebug("Current auth method: {AuthMethod}", authMethod);
+
+        if (authMethod == AuthMethod.OAuth)
+        {
+            token = await settingsService.GetOAuthAccessTokenAsync();
+            logger.LogDebug("Using OAuth authentication, token exists: {HasToken}", !string.IsNullOrEmpty(token));
+        }
+        else if (authMethod == AuthMethod.PersonalAccessToken)
+        {
+            token = await settingsService.GetGitHubTokenAsync();
+            logger.LogDebug("Using PAT authentication, token exists: {HasToken}", !string.IsNullOrEmpty(token));
+        }
+        else
+        {
+            // Fallback: Try to find any available token
+            token = await settingsService.GetOAuthAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                settingsService.SetAuthMethod(AuthMethod.OAuth);
+                logger.LogDebug("Found OAuth token, setting auth method");
+            }
+            else
+            {
+                token = await settingsService.GetGitHubTokenAsync();
+                if (!string.IsNullOrEmpty(token))
+                {
+                    settingsService.SetAuthMethod(AuthMethod.PersonalAccessToken);
+                    logger.LogDebug("Found PAT token, setting auth method");
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(token))
         {
-            logger.LogWarning("No GitHub token found, navigating to token settings");
+            logger.LogWarning("No authentication found, navigating to settings");
             await Shell.Current.GoToAsync("TokenSettingPage");
             return;
         }
 
-        logger.LogDebug("GitHub token found, setting token and loading PRs");
+        logger.LogDebug("Token found, setting token and loading PRs");
         gitHubService.SetToken(token);
         await LoadPullRequestsAsync();
 
