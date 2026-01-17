@@ -25,6 +25,17 @@ public partial class PRListPage : ContentPage
             await _viewModel.InitializeAsync();
             _hasInitialized = true;
         }
+        else
+        {
+            // Restart auto-refresh when returning from settings (in case interval changed)
+            _viewModel.StartAutoRefresh();
+        }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.StopAutoRefresh();
     }
 
     private void OnToggleSidebarClicked(object sender, EventArgs e)
@@ -35,3 +46,4 @@ public partial class PRListPage : ContentPage
         ToggleSidebarButton.Text = _isSidebarVisible ? "☰" : "☰";
     }
 }
+

@@ -34,6 +34,9 @@ public partial class TokenSettingViewModel(
     [ObservableProperty]
     private bool _isUpdateAvailable;
 
+    [ObservableProperty]
+    private int _autoRefreshInterval;
+
     public async Task InitializeAsync()
     {
         logger.LogInformation("Initializing token settings view");
@@ -47,6 +50,16 @@ public partial class TokenSettingViewModel(
         {
             logger.LogDebug("No saved token found");
         }
+
+        // Load auto-refresh interval
+        AutoRefreshInterval = settingsService.GetAutoRefreshInterval();
+        logger.LogDebug("Loaded auto-refresh interval: {Interval} minutes", AutoRefreshInterval);
+    }
+
+    partial void OnAutoRefreshIntervalChanged(int value)
+    {
+        settingsService.SetAutoRefreshInterval(value);
+        logger.LogInformation("Auto-refresh interval saved: {Interval} minutes", value);
     }
 
     [RelayCommand]

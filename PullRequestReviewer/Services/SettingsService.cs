@@ -4,6 +4,7 @@
 public class SettingsService : ISettingsService
 {
     private const string GitHubTokenKey = "github_token";
+    private const string AutoRefreshIntervalKey = "auto_refresh_interval";
 
     /// <inheritdoc/>
     public async Task<string?> GetGitHubTokenAsync()
@@ -44,4 +45,17 @@ public class SettingsService : ISettingsService
         SecureStorage.Remove(GitHubTokenKey);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc/>
+    public int GetAutoRefreshInterval()
+    {
+        return Preferences.Get(AutoRefreshIntervalKey, 0);
+    }
+
+    /// <inheritdoc/>
+    public void SetAutoRefreshInterval(int minutes)
+    {
+        Preferences.Set(AutoRefreshIntervalKey, Math.Max(0, minutes));
+    }
 }
+

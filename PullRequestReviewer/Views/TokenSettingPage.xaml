@@ -97,6 +97,40 @@
 
             <BoxView HeightRequest="1" Color="{DynamicResource Gray300}" Margin="0,20"/>
 
+            <!-- Auto-Refresh Settings -->
+            <Label Text="Auto-Refresh Settings"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,10"/>
+
+            <Label Text="Set the interval (in minutes) for automatic refresh of pull requests. Set to 0 to disable auto-refresh."
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   TextColor="{DynamicResource Gray600}"
+                   Margin="0,0,0,15"/>
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                <Label Text="Refresh every"
+                       VerticalOptions="Center"
+                       TextColor="{DynamicResource Gray600}"/>
+                <Border Stroke="{DynamicResource Primary}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 4"
+                        Padding="8,4"
+                        WidthRequest="80">
+                    <Entry Text="{Binding AutoRefreshInterval}"
+                           Keyboard="Numeric"
+                           HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+                <Label Text="minutes"
+                       VerticalOptions="Center"
+                       TextColor="{DynamicResource Gray600}"/>
+            </HorizontalStackLayout>
+
+            <BoxView HeightRequest="1" Color="{DynamicResource Gray300}" Margin="0,20"/>
+
             <Label Text="Application Updates"
                    FontSize="20"
                    FontAttributes="Bold"

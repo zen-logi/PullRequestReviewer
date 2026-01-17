@@ -27,6 +27,7 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
     [ObservableProperty]
     private bool _hasError;
 
+    private CancellationTokenSource? _autoRefreshCts;
 
     public async Task InitializeAsync()
     {
@@ -42,6 +43,60 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
         logger.LogDebug("GitHub token found, setting token and loading PRs");
         gitHubService.SetToken(token);
         await LoadPullRequestsAsync();
+
+        // Start auto-refresh if configured
+        StartAutoRefresh();
+    }
+
+    public void StartAutoRefresh()
+    {
+        StopAutoRefresh();
+
+        var intervalMinutes = settingsService.GetAutoRefreshInterval();
+        if (intervalMinutes <= 0)
+        {
+            logger.LogDebug("Auto-refresh is disabled (interval: {Interval})", intervalMinutes);
+            return;
+        }
+
+        logger.LogInformation("Starting auto-refresh with interval: {Interval} minutes", intervalMinutes);
+        _autoRefreshCts = new CancellationTokenSource();
+        _ = RunAutoRefreshAsync(intervalMinutes, _autoRefreshCts.Token);
+    }
+
+    public void StopAutoRefresh()
+    {
+        if (_autoRefreshCts != null)
+        {
+            logger.LogDebug("Stopping auto-refresh");
+            _autoRefreshCts.Cancel();
+            _autoRefreshCts.Dispose();
+            _autoRefreshCts = null;
+        }
+    }
+
+    private async Task RunAutoRefreshAsync(int intervalMinutes, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromMinutes(intervalMinutes));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!IsLoading && !IsRefreshing)
+                {
+                    logger.LogInformation("Auto-refresh triggered");
+                    await LoadPullRequestsAsync();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogDebug("Auto-refresh cancelled");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in auto-refresh");
+        }
     }
 
     [RelayCommand]
@@ -137,3 +192,4 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
         await Shell.Current.GoToAsync("TokenSettingPage");
     }
 }
+
