@@ -567,6 +567,7 @@ public class GitHubService(
             Title = pr.Title,
             HtmlUrl = pr.Url,
             State = pr.IsDraft ? "draft" : pr.State.ToLowerInvariant(),
+            IsDraft = pr.IsDraft,
             RepositoryFullName = pr.Repository?.NameWithOwner ?? "",
             AuthorLogin = pr.Author?.Login ?? "unknown",
             AuthorAvatarUrl = pr.Author?.AvatarUrl ?? "",

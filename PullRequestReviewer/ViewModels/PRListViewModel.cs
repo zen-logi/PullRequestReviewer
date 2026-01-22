@@ -7,10 +7,17 @@ using PullRequestReviewer.Services;
 
 namespace PullRequestReviewer.ViewModels;
 
-public partial class PRListViewModel(IGitHubService gitHubService, ISettingsService settingsService, ILogger<PRListViewModel> logger) : ObservableObject
+public partial class PRListViewModel : ObservableObject
 {
+    private readonly IGitHubService gitHubService;
+    private readonly ISettingsService settingsService;
+    private readonly ILogger<PRListViewModel> logger;
+
     [ObservableProperty]
     private ObservableCollection<PullRequestModel> _pullRequests = new();
+
+    [ObservableProperty]
+    private ObservableCollection<PullRequestModel> _filteredPullRequests = new();
 
     [ObservableProperty]
     private PullRequestFilterType _currentFilter = PullRequestFilterType.All;
@@ -27,7 +34,51 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
     [ObservableProperty]
     private bool _hasError;
 
+    [ObservableProperty]
+    private bool _isFilterPopupVisible;
+
+    [ObservableProperty]
+    private StatusFilterModel _currentStatusFilter = new();
+
+    [ObservableProperty]
+    private bool _isStatusFilterActive;
+
+    /// <summary>
+    /// タブごとのステータスフィルター状態を保持する辞書。
+    /// </summary>
+    private readonly Dictionary<PullRequestFilterType, StatusFilterModel> _statusFiltersPerTab;
+
     private CancellationTokenSource? _autoRefreshCts;
+
+    public PRListViewModel(IGitHubService gitHubService, ISettingsService settingsService, ILogger<PRListViewModel> logger)
+    {
+        this.gitHubService = gitHubService;
+        this.settingsService = settingsService;
+        this.logger = logger;
+
+        // タブごとのフィルターを初期化し、イベントをサブスクライブ
+        _statusFiltersPerTab = new Dictionary<PullRequestFilterType, StatusFilterModel>
+        {
+            { PullRequestFilterType.All, new StatusFilterModel() },
+            { PullRequestFilterType.ReviewRequested, new StatusFilterModel() },
+            { PullRequestFilterType.Assigned, new StatusFilterModel() },
+            { PullRequestFilterType.Authored, new StatusFilterModel() }
+        };
+
+        foreach (var filter in _statusFiltersPerTab.Values)
+        {
+            filter.FilterChanged += OnStatusFilterChanged;
+        }
+
+        // 初期タブのフィルターを設定
+        CurrentStatusFilter = _statusFiltersPerTab[PullRequestFilterType.All];
+    }
+
+    private void OnStatusFilterChanged(object? sender, EventArgs e)
+    {
+        IsStatusFilterActive = CurrentStatusFilter.IsActive;
+        ApplyStatusFilter();
+    }
 
     public async Task InitializeAsync()
     {
@@ -167,6 +218,9 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
                 PullRequests.Add(pr);
             }
 
+            // ステータスフィルターを適用
+            ApplyStatusFilter();
+
             logger.LogInformation("Successfully loaded {Count} pull requests into ObservableCollection", PullRequests.Count);
         }
         catch (Exception ex)
@@ -198,6 +252,14 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
         {
             logger.LogInformation("Changing filter from {OldFilter} to {NewFilter}", CurrentFilter, filter);
             CurrentFilter = filter;
+
+            // タブに応じたステータスフィルターを切り替え
+            if (_statusFiltersPerTab.TryGetValue(filter, out var statusFilter))
+            {
+                CurrentStatusFilter = statusFilter;
+                IsStatusFilterActive = statusFilter.IsActive;
+            }
+
             await LoadPullRequestsAsync();
         }
         else
@@ -225,5 +287,80 @@ public partial class PRListViewModel(IGitHubService gitHubService, ISettingsServ
     {
         logger.LogInformation("Navigating to token settings page");
         await Shell.Current.GoToAsync("TokenSettingPage");
+    }
+
+    /// <summary>
+    /// フィルターポップアップの表示を切り替える。
+    /// </summary>
+    [RelayCommand]
+    private void ToggleFilterPopup()
+    {
+        IsFilterPopupVisible = !IsFilterPopupVisible;
+        logger.LogDebug("Filter popup visibility toggled: {IsVisible}", IsFilterPopupVisible);
+    }
+
+    /// <summary>
+    /// フィルターポップアップを閉じる。
+    /// </summary>
+    [RelayCommand]
+    private void CloseFilterPopup()
+    {
+        IsFilterPopupVisible = false;
+    }
+
+    /// <summary>
+    /// ステータスフィルターの選択を切り替える。
+    /// </summary>
+    [RelayCommand]
+    private void ToggleStatusFilter(string statusType)
+    {
+        logger.LogDebug("Toggling status filter: {StatusType}", statusType);
+
+        switch (statusType.ToLowerInvariant())
+        {
+            case "open":
+                CurrentStatusFilter.ShowOpen = !CurrentStatusFilter.ShowOpen;
+                break;
+            case "closed":
+                CurrentStatusFilter.ShowClosed = !CurrentStatusFilter.ShowClosed;
+                break;
+            case "merged":
+                CurrentStatusFilter.ShowMerged = !CurrentStatusFilter.ShowMerged;
+                break;
+        }
+
+        IsStatusFilterActive = CurrentStatusFilter.IsActive;
+        ApplyStatusFilter();
+    }
+
+    /// <summary>
+    /// ステータスフィルターをリセットする。
+    /// </summary>
+    [RelayCommand]
+    private void ResetStatusFilter()
+    {
+        logger.LogDebug("Resetting status filter");
+        CurrentStatusFilter.Reset();
+        IsStatusFilterActive = false;
+        ApplyStatusFilter();
+    }
+
+    /// <summary>
+    /// 現在のステータスフィルター設定に基づいてPR一覧をフィルタリングする。
+    /// </summary>
+    private void ApplyStatusFilter()
+    {
+        FilteredPullRequests.Clear();
+
+        foreach (var pr in PullRequests)
+        {
+            if (CurrentStatusFilter.ShouldShow(pr.State, pr.IsDraft))
+            {
+                FilteredPullRequests.Add(pr);
+            }
+        }
+
+        logger.LogDebug("Applied status filter: {Filtered}/{Total} PRs shown",
+            FilteredPullRequests.Count, PullRequests.Count);
     }
 }
