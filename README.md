@@ -15,8 +15,9 @@ A cross-platform application for managing and reviewing your GitHub pull request
 ### Windows
 
 1. Download the latest release from the [Releases](../../releases) page
-2. Extract the zip file
-3. Run `PullRequestReviewer.exe`
+2. Run `PullRequestReviewer-Setup.exe`
+3. Follow the installation wizard
+4. Launch Pull Request Reviewer from the Start Menu or Desktop shortcut
 
 ### macOS
 
