@@ -15,6 +15,7 @@ obj/
 .idea/**
 .vscode/
 *.code-workspace
+.agent/
 *.vs/
 
 # OS generated files
