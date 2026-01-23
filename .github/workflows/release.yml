@@ -76,7 +76,7 @@ jobs:
           retention-days: 5
 
   create-release:
-    needs: build-windows
+    needs: [build-windows, versioning]
     runs-on: ubuntu-latest
     
     steps:
@@ -95,4 +95,4 @@ jobs:
             artifacts/PullRequestReviewer-Setup.exe
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.versioning.outputs.new_version, '-') }}
