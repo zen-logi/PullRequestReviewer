@@ -268,8 +268,8 @@
                                                         HorizontalOptions="Start"
                                                         StrokeShape="RoundRectangle 4"
                                                         Margin="60,0,0,0"
-                                                        IsVisible="{Binding ReviewStatus, Converter={StaticResource StringNotEmptyConverter}}">
-                                                    <Label Text="{Binding ReviewStatus}"
+                                                        IsVisible="{Binding ReviewStatusText, Converter={StaticResource StringNotEmptyConverter}}">
+                                                    <Label Text="{Binding ReviewStatusText}"
                                                           TextColor="White"
                                                           FontSize="12"
                                                           FontAttributes="Bold"/>
