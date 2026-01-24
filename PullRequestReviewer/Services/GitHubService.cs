@@ -320,7 +320,12 @@ public class GitHubService(
                     reviewsResponse.EnsureSuccessStatusCode();
                     var reviews = await reviewsResponse.Content.ReadFromJsonAsync<List<GitHubReview>>(jsonOptions);
 
-                    if (reviews != null && reviews.Count > 0)
+                    // Re-Requestされている場合は常にPendingとして扱う
+                    if (pr.RequestedReviewers?.Count > 0)
+                    {
+                        model.ReviewStatus = ReviewStatus.Pending;
+                    }
+                    else if (reviews != null && reviews.Count > 0)
                     {
                         // Calculate review status based on the latest review for each reviewer
                         var latestReviews = reviews
@@ -330,30 +335,30 @@ public class GitHubService(
 
                         if (latestReviews.Any(r => r.State == "CHANGES_REQUESTED"))
                         {
-                            model.ReviewStatus = "Changes Requested";
+                            model.ReviewStatus = ReviewStatus.ChangesRequested;
                         }
                         else if (latestReviews.Any(r => r.State == "APPROVED"))
                         {
-                            model.ReviewStatus = "Approved";
+                            model.ReviewStatus = ReviewStatus.Approved;
                         }
                         else if (latestReviews.Any(r => r.State == "COMMENTED"))
                         {
-                            model.ReviewStatus = "Commented";
+                            model.ReviewStatus = ReviewStatus.Commented;
                         }
                         else
                         {
-                            model.ReviewStatus = "Review Requested";
+                            model.ReviewStatus = ReviewStatus.Pending;
                         }
                     }
                     else
                     {
-                        model.ReviewStatus = "No Reviews";
+                        model.ReviewStatus = ReviewStatus.NoReviews;
                     }
                 }
                 catch (Exception ex)
                 {
                     logger.LogWarning(ex, "Failed to fetch reviews for {Repo}#{Number}", repoFullName, issue.Number);
-                    model.ReviewStatus = "Error";
+                    model.ReviewStatus = ReviewStatus.Error;
                 }
 
                 logger.LogDebug("Converted PR: {Repo}#{Number} - {Title}", repoFullName, issue.Number, issue.Title);
@@ -573,8 +578,7 @@ public class GitHubService(
             AuthorAvatarUrl = pr.Author?.AvatarUrl ?? "",
             CreatedAt = pr.CreatedAt,
             UpdatedAt = pr.UpdatedAt,
-            ReviewStatus = reviewStatus,
-            ReviewStatusColor = GetGraphQLReviewStatusColor(reviewStatus)
+            ReviewStatus = reviewStatus
         };
     }
 
@@ -582,15 +586,21 @@ public class GitHubService(
     /// PR のレビュー状態（承認、変更要求など）を計算する。
     /// </summary>
     /// <param name="pr">GraphQL から取得した PR データ。</param>
-    /// <returns>レビュー状態を表す文字列。</returns>
-    private static string CalculateGraphQLReviewStatus(GraphQLPullRequest pr)
+    /// <returns>レビュー状態。</returns>
+    private static ReviewStatus CalculateGraphQLReviewStatus(GraphQLPullRequest pr)
     {
         var reviews = pr.Reviews?.Nodes ?? [];
+        var pendingReviewers = pr.ReviewRequests?.Nodes?.Count ?? 0;
+
+        // Re-Requestされている場合は常にPendingとして扱う
+        if (pendingReviewers > 0)
+        {
+            return ReviewStatus.Pending;
+        }
 
         if (reviews.Count == 0)
         {
-            var pendingReviewers = pr.ReviewRequests?.Nodes?.Count ?? 0;
-            return pendingReviewers > 0 ? "Pending" : "No reviews";
+            return ReviewStatus.NoReviews;
         }
 
         var latestReviews = reviews
@@ -604,29 +614,13 @@ public class GitHubService(
         var commented = latestReviews.Count(r => r.State == "COMMENTED");
 
         if (changesRequested > 0)
-            return "Changes requested";
+            return ReviewStatus.ChangesRequested;
         if (approved > 0)
-            return "Approved";
+            return ReviewStatus.Approved;
         if (commented > 0)
-            return "Commented";
+            return ReviewStatus.Commented;
 
-        return "Pending";
-    }
-
-    /// <summary>
-    /// レビュー状態に対応する表示色を取得する。
-    /// </summary>
-    /// <param name="status">レビュー状態。</param>
-    /// <returns>16進数カラーコード。</returns>
-    private static string GetGraphQLReviewStatusColor(string status)
-    {
-        if (status.StartsWith("Approved"))
-            return "#28a745";
-        if (status.StartsWith("Changes requested"))
-            return "#d73a49";
-        if (status.StartsWith("Commented"))
-            return "#6f42c1";
-        return "#6a737d";
+        return ReviewStatus.Pending;
     }
 
     #endregion

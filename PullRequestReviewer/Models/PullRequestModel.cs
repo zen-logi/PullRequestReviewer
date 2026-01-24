@@ -96,26 +96,35 @@ public class PullRequestModel
     public string StateColor => State?.ToLower() == "open" ? "#28a745" : "#6f42c1";
 
     /// <summary>
-    /// Gets or sets the calculated review status (e.g., "Approved", "Changes Requested").
+    /// Gets or sets the calculated review status.
     /// </summary>
-    public string? ReviewStatus { get; set; }
-
-    private string? _reviewStatusColor;
+    public ReviewStatus ReviewStatus { get; set; }
 
     /// <summary>
-    /// Gets or sets the color associated with the review status.
-    /// If not explicitly set, calculates based on ReviewStatus.
+    /// Gets the display text for the review status.
     /// </summary>
-    public string ReviewStatusColor
+    public string ReviewStatusText => ReviewStatus switch
     {
-        get => _reviewStatusColor ?? ReviewStatus switch
-        {
-            "Approved" => "#28a745", // Green
-            "Changes Requested" => "#dc3545", // Red
-            "Review Requested" => "#e36209", // Orange
-            "Commented" => "#17a2b8", // Blue
-            _ => "#6c757d" // Gray
-        };
-        set => _reviewStatusColor = value;
-    }
+        ReviewStatus.NoReviews => "No reviews",
+        ReviewStatus.Pending => "Pending",
+        ReviewStatus.Commented => "Commented",
+        ReviewStatus.Approved => "Approved",
+        ReviewStatus.ChangesRequested => "Changes requested",
+        ReviewStatus.Error => "Error",
+        _ => string.Empty
+    };
+
+    /// <summary>
+    /// Gets the color associated with the review status.
+    /// </summary>
+    public string ReviewStatusColor => ReviewStatus switch
+    {
+        ReviewStatus.Approved => "#28a745", // Green
+        ReviewStatus.ChangesRequested => "#dc3545", // Red
+        ReviewStatus.Pending => "#e36209", // Orange
+        ReviewStatus.Commented => "#17a2b8", // Blue
+        ReviewStatus.NoReviews => "#6c757d", // Gray
+        ReviewStatus.Error => "#dc3545", // Red
+        _ => "#6c757d" // Gray
+    };
 }
