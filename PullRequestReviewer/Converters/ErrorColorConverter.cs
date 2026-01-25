@@ -2,6 +2,9 @@
 
 namespace PullRequestReviewer.Converters;
 
+/// <summary>
+/// エラー状態に応じて色を変換するコンバーター
+/// </summary>
 public class ErrorColorConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

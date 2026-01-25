@@ -1,107 +1,108 @@
 ﻿namespace PullRequestReviewer.Models;
 
 /// <summary>
-/// Represents a GitHub Pull Request with additional UI-specific properties.
+/// GitHubプルリクエストおよびUI固有のプロパティを表すモデル
 /// </summary>
 public class PullRequestModel
 {
     /// <summary>
-    /// Gets or sets the unique identifier of the pull request.
+    /// プルリクエストの一意な識別子を取得または設定する
     /// </summary>
     public long Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the pull request number.
+    /// プルリクエスト番号を取得または設定する
     /// </summary>
     public int Number { get; set; }
 
     /// <summary>
-    /// Gets or sets the title of the pull request.
+    /// プルリクエストのタイトルを取得または設定する
     /// </summary>
     public string? Title { get; set; }
 
     /// <summary>
-    /// Gets or sets the state of the pull request (e.g., open, closed).
+    /// プルリクエストの状態（open、closedなど）を取得または設定する
     /// </summary>
     public string? State { get; set; }
 
     /// <summary>
-    /// Gets or sets the body/description of the pull request.
+    /// プルリクエストの本文/説明を取得または設定する
     /// </summary>
     public string Body { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the HTML URL of the pull request.
+    /// プルリクエストのHTML URLを取得または設定する
     /// </summary>
     public string? HtmlUrl { get; set; }
 
     /// <summary>
-    /// Gets or sets the creation date and time of the pull request.
+    /// プルリクエストの作成日時を取得または設定する
     /// </summary>
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// Gets or sets the last update date and time of the pull request.
+    /// プルリクエストの最終更新日時を取得または設定する
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
 
     /// <summary>
-    /// Gets or sets the username of the author.
+    /// 作成者のユーザー名を取得または設定する
     /// </summary>
     public string AuthorLogin { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the avatar URL of the author.
+    /// 作成者のアバターURLを取得または設定する
     /// </summary>
     public string? AuthorAvatarUrl { get; set; }
 
     /// <summary>
-    /// Gets or sets the name of the repository (e.g., "RepoName").
+    /// リポジトリ名（例: "RepoName"）を取得または設定する
     /// </summary>
     public string RepositoryName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the owner of the repository.
+    /// リポジトリのオーナーを取得または設定する
     /// </summary>
     public string RepositoryOwner { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the full name of the repository (e.g., "Owner/RepoName").
+    /// リポジトリのフルネーム（例: "Owner/RepoName"）を取得または設定する
     /// </summary>
     public string RepositoryFullName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the pull request is a draft.
+    /// プルリクエストがドラフトかどうかを示す値を取得または設定する
     /// </summary>
     public bool IsDraft { get; set; }
 
     /// <summary>
-    /// Gets or sets the list of users requested for review.
+    /// レビュー依頼されたユーザーのリストを取得または設定する
     /// </summary>
     public List<string> RequestedReviewers { get; set; } = null!;
 
     /// <summary>
-    /// Gets or sets the list of assignees.
+    /// アサインされたユーザーのリストを取得または設定する
     /// </summary>
     public List<string> Assignees { get; set; } = null!;
 
     /// <summary>
-    /// Gets a formatted string of the creation date.
+    /// フォーマットされた作成日時文字列を取得する
     /// </summary>
     public string DisplayCreatedAt => CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
 
     /// <summary>
-    /// Gets the color associated with the pull request state.
+    /// プルリクエストの状態に対応する色を取得する
     /// </summary>
     public string StateColor => State?.ToLower() == "open" ? "#28a745" : "#6f42c1";
 
     /// <summary>
-    /// Gets or sets the calculated review status.
+    /// 計算されたレビュー状態（"Approved"、"Changes Requested"など）を取得または設定する
     /// </summary>
     public ReviewStatus ReviewStatus { get; set; }
 
     /// <summary>
-    /// Gets the display text for the review status.
+    /// レビュー状態に対応する色を取得または設定する。
+    /// 明示的に設定されていない場合はReviewStatusに基づいて計算する
     /// </summary>
     public string ReviewStatusText => ReviewStatus switch
     {

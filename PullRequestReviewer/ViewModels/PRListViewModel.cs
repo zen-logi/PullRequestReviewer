@@ -7,12 +7,14 @@ using PullRequestReviewer.Services;
 
 namespace PullRequestReviewer.ViewModels;
 
-public partial class PRListViewModel : ObservableObject
+/// <summary>
+/// PRリスト画面のViewModel
+/// </summary>
+public partial class PRListViewModel(
+    IGitHubService gitHubService,
+    ISettingsService settingsService,
+    ILogger<PRListViewModel> logger) : ObservableObject
 {
-    private readonly IGitHubService gitHubService;
-    private readonly ISettingsService settingsService;
-    private readonly ILogger<PRListViewModel> logger;
-
     [ObservableProperty]
     private ObservableCollection<PullRequestModel> _pullRequests = new();
 
@@ -44,27 +46,23 @@ public partial class PRListViewModel : ObservableObject
     private bool _isStatusFilterActive;
 
     /// <summary>
-    /// タブごとのステータスフィルター状態を保持する辞書。
+    /// タブごとのステータスフィルター状態を保持する辞書
     /// </summary>
-    private readonly Dictionary<PullRequestFilterType, StatusFilterModel> _statusFiltersPerTab;
+    private readonly Dictionary<PullRequestFilterType, StatusFilterModel> _statusFiltersPerTab = new()
+    {
+        { PullRequestFilterType.All, new StatusFilterModel() },
+        { PullRequestFilterType.ReviewRequested, new StatusFilterModel() },
+        { PullRequestFilterType.Assigned, new StatusFilterModel() },
+        { PullRequestFilterType.Authored, new StatusFilterModel() }
+    };
 
     private CancellationTokenSource? _autoRefreshCts;
 
-    public PRListViewModel(IGitHubService gitHubService, ISettingsService settingsService, ILogger<PRListViewModel> logger)
+    /// <summary>
+    /// ViewModelを初期化する
+    /// </summary>
+    public void Initialize()
     {
-        this.gitHubService = gitHubService;
-        this.settingsService = settingsService;
-        this.logger = logger;
-
-        // タブごとのフィルターを初期化し、イベントをサブスクライブ
-        _statusFiltersPerTab = new Dictionary<PullRequestFilterType, StatusFilterModel>
-        {
-            { PullRequestFilterType.All, new StatusFilterModel() },
-            { PullRequestFilterType.ReviewRequested, new StatusFilterModel() },
-            { PullRequestFilterType.Assigned, new StatusFilterModel() },
-            { PullRequestFilterType.Authored, new StatusFilterModel() }
-        };
-
         foreach (var filter in _statusFiltersPerTab.Values)
         {
             filter.FilterChanged += OnStatusFilterChanged;
@@ -80,11 +78,15 @@ public partial class PRListViewModel : ObservableObject
         ApplyStatusFilter();
     }
 
+    /// <summary>
+    /// 非同期初期化を実行する
+    /// </summary>
     public async Task InitializeAsync()
     {
+        Initialize();
         logger.LogInformation("Initializing PR list view");
 
-        // Get token based on auth method
+        // 認証方式に基づいてトークンを取得
         string? token = null;
         var authMethod = settingsService.GetAuthMethod();
         logger.LogDebug("Current auth method: {AuthMethod}", authMethod);

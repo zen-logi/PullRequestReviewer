@@ -3,46 +3,46 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace PullRequestReviewer.Models;
 
 /// <summary>
-/// ステータス絞り込みの選択状態を管理するモデル。
+/// ステータス絞り込みの選択状態を管理するモデル
 /// </summary>
 public partial class StatusFilterModel : ObservableObject
 {
     /// <summary>
-    /// フィルター設定が変更された際に発火するイベント。
+    /// フィルター設定が変更された際に発火するイベント
     /// </summary>
     public event EventHandler? FilterChanged;
 
     /// <summary>
-    /// Openステータスを表示するかどうか。
+    /// Openステータスを表示するかどうか
     /// </summary>
     [ObservableProperty]
     private bool _showOpen = true;
 
     /// <summary>
-    /// Closedステータスを表示するかどうか。
+    /// Closedステータスを表示するかどうか
     /// </summary>
     [ObservableProperty]
     private bool _showClosed = true;
 
     /// <summary>
-    /// Mergedステータスを表示するかどうか。
+    /// Mergedステータスを表示するかどうか
     /// </summary>
     [ObservableProperty]
     private bool _showMerged = true;
 
     /// <summary>
-    /// Draft PRを表示するかどうか。
+    /// Draft PRを表示するかどうか
     /// </summary>
     [ObservableProperty]
     private bool _showDraft = true;
 
     /// <summary>
-    /// フィルターがデフォルト状態（全て表示）かどうかを取得する。
+    /// フィルターがデフォルト状態（全て表示）かどうかを取得する
     /// </summary>
     public bool IsDefault => ShowOpen && ShowClosed && ShowMerged && ShowDraft;
 
     /// <summary>
-    /// フィルターがアクティブ（デフォルトから変更されている）かどうかを取得する。
+    /// フィルターがアクティブ（デフォルトから変更されている）かどうかを取得する
     /// </summary>
     public bool IsActive => !IsDefault;
 
@@ -51,13 +51,16 @@ public partial class StatusFilterModel : ObservableObject
     partial void OnShowMergedChanged(bool value) => OnFilterSettingChanged();
     partial void OnShowDraftChanged(bool value) => OnFilterSettingChanged();
 
+    /// <summary>
+    /// フィルター設定変更時の通知を行う
+    /// </summary>
     private void OnFilterSettingChanged()
     {
         FilterChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
-    /// フィルターをデフォルト状態（全て表示）にリセットする。
+    /// フィルターをデフォルト状態（全て表示）にリセットする
     /// </summary>
     public void Reset()
     {
@@ -68,7 +71,7 @@ public partial class StatusFilterModel : ObservableObject
     }
 
     /// <summary>
-    /// 指定されたPRがフィルターを通過するかどうかを判定する。
+    /// 指定されたPRがフィルターを通過するかどうかを判定する
     /// </summary>
     /// <param name="state">PRのステータス（open, closed, merged）</param>
     /// <param name="isDraft">ドラフトPRかどうか</param>

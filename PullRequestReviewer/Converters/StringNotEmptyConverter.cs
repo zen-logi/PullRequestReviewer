@@ -2,6 +2,9 @@
 
 namespace PullRequestReviewer.Converters;
 
+/// <summary>
+/// 文字列が空でないかを判定するコンバーター
+/// </summary>
 public class StringNotEmptyConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

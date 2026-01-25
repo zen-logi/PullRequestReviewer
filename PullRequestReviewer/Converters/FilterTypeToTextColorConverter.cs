@@ -3,6 +3,9 @@ using PullRequestReviewer.Models;
 
 namespace PullRequestReviewer.Converters;
 
+/// <summary>
+/// フィルタータイプに応じてテキスト色を変換するコンバーター
+/// </summary>
 public class FilterTypeToTextColorConverter : IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
